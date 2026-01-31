@@ -1,0 +1,109 @@
+Build me a fully functional, global-scale web application called 
+“QR Ticket Approval & Event Management System”.
+
+MAIN PURPOSE:
+This app should allow students, professionals, companies, and organizers 
+to create events, generate tickets, approve participants, and verify entry 
+using QR codes.
+
+CORE FEATURES:
+
+1. USER ROLES
+- Admin (Event Organizer / Company)
+- Participant (Student / Professional)
+- Verifier (Check-in / Check-out staff)
+
+2. AUTHENTICATION
+- Login & Signup for:
+  - Admins / Companies
+  - Participants / Students / Professionals
+- Email + Password authentication
+- Secure session handling
+
+3. EVENT & FORM BUILDER (ADMIN PANEL)
+Admins can:
+- Create multiple events (Hackathons, Tech Events, College Fests, Conferences)
+- Design custom registration forms dynamically using:
+  - Name
+  - Email ID
+  - Phone Number
+  - Roll Number
+  - Current Semester
+  - Course (Dropdown)
+  - College / Company Name
+  - Location Preferences
+  - Custom fields (Text, Dropdown, Checkbox, File Upload, etc.)
+- Save form templates for:
+  - Hackathons
+  - Big Events
+  - College Events
+- Generate a public registration link for each event
+
+4. TICKET GENERATION SYSTEM
+- Once a participant submits the form:
+  - Auto-generate a unique ticket
+  - Generate a unique QR code linked to that ticket
+  - Generate a shareable ticket link (global access)
+- Ticket should include:
+  - Event Name
+  - Date & Time
+  - Location
+  - Participant Details
+  - QR Code
+- Ticket should be viewable as:
+  - Web ticket (mobile friendly)
+  - Screenshot-friendly layout
+  - Downloadable / Shareable link
+
+5. QR CODE APPROVAL & VERIFICATION
+- QR code should:
+  - Be unique per participant
+  - Work globally
+- Verifier dashboard:
+  - Scan QR code
+  - Show participant details
+  - Allow:
+    - Check-In
+    - Check-Out
+- Prevent duplicate check-ins
+- Show real-time status (Checked-in / Checked-out)
+
+6. ADMIN DASHBOARD
+- View all registrations
+- Approve / Reject participants (optional)
+- Export data (CSV)
+- See analytics:
+  - Total registrations
+  - Checked-in users
+  - Active users
+- Control event settings:
+  - Enable/Disable check-in
+  - Enable approval-based tickets
+
+7. TECH REQUIREMENTS
+- Clean, modern, professional UI (mobile-first)
+- Fully connected:
+  - Frontend
+  - Backend logic
+  - Database
+- Add sample data for testing all features
+- Scalable architecture (global usage ready)
+
+8. DATABASE
+- Users
+- Events
+- Forms
+- Tickets
+- QR Codes
+- Check-in / Check-out logs
+
+9. EXTRA
+- Ticket link should work without login (view-only)
+- QR scan should validate in real time
+- System should be extensible for future features
+
+FINAL STEP:
+After building, explain:
+- How to add new fields to forms
+- How to add new pages or features
+- How to scale for large hackathons & enterprise events
