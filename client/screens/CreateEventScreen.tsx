@@ -1,13 +1,10 @@
-import React, { useState } from "react";
-import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import React, { useState, useCallback, memo } from "react";
+import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { Platform } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
@@ -30,6 +27,34 @@ const defaultFields: FormField[] = [
   { id: "phone", type: "phone", label: "Phone Number", required: false },
 ];
 
+const FieldRow = memo(function FieldRow({
+  field,
+  index,
+  onRemove,
+  theme,
+}: {
+  field: FormField;
+  index: number;
+  onRemove: (id: string) => void;
+  theme: any;
+}) {
+  return (
+    <View style={[styles.fieldRow, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
+      <View style={styles.fieldInfo}>
+        <ThemedText type="body">{field.label}</ThemedText>
+        <ThemedText type="small" style={styles.fieldType}>
+          {field.type} {field.required ? "(required)" : "(optional)"}
+        </ThemedText>
+      </View>
+      {index >= 3 ? (
+        <Pressable onPress={() => onRemove(field.id)} style={styles.removeButton}>
+          <Feather name="trash-2" size={18} color={theme.error} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+});
+
 export default function CreateEventScreen({ navigation }: any) {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -40,8 +65,6 @@ export default function CreateEventScreen({ navigation }: any) {
   const [location, setLocation] = useState("");
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [formFields, setFormFields] = useState<FormField[]>(defaultFields);
   const [error, setError] = useState("");
@@ -63,7 +86,7 @@ export default function CreateEventScreen({ navigation }: any) {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     if (!title.trim()) {
       setError("Please enter an event title");
       return;
@@ -79,21 +102,21 @@ export default function CreateEventScreen({ navigation }: any) {
       checkInEnabled: true,
       formFields,
     });
-  };
+  }, [title, description, location, startDate, endDate, requiresApproval, formFields, createEventMutation]);
 
-  const addField = () => {
+  const addField = useCallback(() => {
     const newField: FormField = {
       id: `field_${Date.now()}`,
       type: "text",
       label: "New Field",
       required: false,
     };
-    setFormFields([...formFields, newField]);
-  };
+    setFormFields((prev) => [...prev, newField]);
+  }, []);
 
-  const removeField = (id: string) => {
-    setFormFields(formFields.filter((f) => f.id !== id));
-  };
+  const removeField = useCallback((id: string) => {
+    setFormFields((prev) => prev.filter((f) => f.id !== id));
+  }, []);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
@@ -106,14 +129,20 @@ export default function CreateEventScreen({ navigation }: any) {
     });
   };
 
+  const toggleApproval = useCallback(() => {
+    setRequiresApproval((prev) => !prev);
+  }, []);
+
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAwareScrollViewCompat
+      <ScrollView
         contentContainerStyle={{
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: insets.bottom + Spacing["2xl"],
           paddingHorizontal: Spacing.lg,
         }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <ThemedText type="h2" style={styles.title}>
           Create Event
@@ -150,10 +179,7 @@ export default function CreateEventScreen({ navigation }: any) {
           <ThemedText type="h4" style={styles.sectionTitle}>
             Date & Time
           </ThemedText>
-          <Pressable
-            onPress={() => setShowStartPicker(true)}
-            style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
-          >
+          <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
             <Feather name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
@@ -161,12 +187,9 @@ export default function CreateEventScreen({ navigation }: any) {
               </ThemedText>
               <ThemedText type="body">{formatDate(startDate)}</ThemedText>
             </View>
-          </Pressable>
+          </View>
 
-          <Pressable
-            onPress={() => setShowEndPicker(true)}
-            style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}
-          >
+          <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
             <Feather name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
@@ -174,29 +197,7 @@ export default function CreateEventScreen({ navigation }: any) {
               </ThemedText>
               <ThemedText type="body">{formatDate(endDate)}</ThemedText>
             </View>
-          </Pressable>
-
-          {(showStartPicker || showEndPicker) && Platform.OS !== "web" ? (
-            <DateTimePicker
-              value={showStartPicker ? startDate : endDate}
-              mode="datetime"
-              onChange={(event, date) => {
-                if (Platform.OS === "android") {
-                  setShowStartPicker(false);
-                  setShowEndPicker(false);
-                }
-                if (date) {
-                  if (showStartPicker) {
-                    setStartDate(date);
-                    setShowStartPicker(false);
-                  } else {
-                    setEndDate(date);
-                    setShowEndPicker(false);
-                  }
-                }
-              }}
-            />
-          ) : null}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -204,7 +205,7 @@ export default function CreateEventScreen({ navigation }: any) {
             Settings
           </ThemedText>
           <Pressable
-            onPress={() => setRequiresApproval(!requiresApproval)}
+            onPress={toggleApproval}
             style={[styles.toggle, { backgroundColor: theme.backgroundDefault }]}
           >
             <View style={styles.toggleInfo}>
@@ -241,22 +242,13 @@ export default function CreateEventScreen({ navigation }: any) {
           </View>
 
           {formFields.map((field, index) => (
-            <View
+            <FieldRow
               key={field.id}
-              style={[styles.fieldRow, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}
-            >
-              <View style={styles.fieldInfo}>
-                <ThemedText type="body">{field.label}</ThemedText>
-                <ThemedText type="small" style={styles.fieldType}>
-                  {field.type} {field.required ? "(required)" : "(optional)"}
-                </ThemedText>
-              </View>
-              {index >= 3 ? (
-                <Pressable onPress={() => removeField(field.id)} style={styles.removeButton}>
-                  <Feather name="trash-2" size={18} color={theme.error} />
-                </Pressable>
-              ) : null}
-            </View>
+              field={field}
+              index={index}
+              onRemove={removeField}
+              theme={theme}
+            />
           ))}
         </View>
 
@@ -277,7 +269,7 @@ export default function CreateEventScreen({ navigation }: any) {
             "Create Event"
           )}
         </Button>
-      </KeyboardAwareScrollViewCompat>
+      </ScrollView>
     </ThemedView>
   );
 }

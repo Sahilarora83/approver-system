@@ -1,15 +1,11 @@
+import React from "react";
 import { Platform, ScrollView, ScrollViewProps } from "react-native";
-import {
-  KeyboardAwareScrollView,
-  KeyboardAwareScrollViewProps,
-} from "react-native-keyboard-controller";
 
-type Props = KeyboardAwareScrollViewProps & ScrollViewProps;
+type Props = ScrollViewProps & {
+  children?: React.ReactNode;
+  bottomOffset?: number;
+};
 
-/**
- * KeyboardAwareScrollView that falls back to ScrollView on web.
- * Use this for any screen containing text inputs.
- */
 export function KeyboardAwareScrollViewCompat({
   children,
   keyboardShouldPersistTaps = "handled",
@@ -26,12 +22,24 @@ export function KeyboardAwareScrollViewCompat({
     );
   }
 
-  return (
-    <KeyboardAwareScrollView
-      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-      {...props}
-    >
-      {children}
-    </KeyboardAwareScrollView>
-  );
+  try {
+    const { KeyboardAwareScrollView } = require("react-native-keyboard-controller");
+    return (
+      <KeyboardAwareScrollView
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+        {...props}
+      >
+        {children}
+      </KeyboardAwareScrollView>
+    );
+  } catch {
+    return (
+      <ScrollView
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+        {...props}
+      >
+        {children}
+      </ScrollView>
+    );
+  }
 }

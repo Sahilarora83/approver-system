@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Pressable, ActivityIndicator } from "react-native";
+import React, { useState, useCallback, memo } from "react";
+import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
@@ -12,6 +11,40 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
 type Role = "admin" | "participant" | "verifier";
+
+const RoleTab = memo(function RoleTab({
+  role,
+  label,
+  selected,
+  onSelect,
+  theme,
+}: {
+  role: Role;
+  label: string;
+  selected: boolean;
+  onSelect: (role: Role) => void;
+  theme: any;
+}) {
+  return (
+    <Pressable
+      onPress={() => onSelect(role)}
+      style={[
+        styles.roleTab,
+        selected && { backgroundColor: theme.backgroundDefault },
+      ]}
+    >
+      <ThemedText
+        type="small"
+        style={[
+          styles.roleText,
+          selected && { color: theme.primary, fontWeight: "600" },
+        ]}
+      >
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+});
 
 export default function LoginScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -30,7 +63,7 @@ export default function LoginScreen({ navigation }: any) {
     { key: "verifier", label: "Verifier" },
   ];
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields");
       return;
@@ -48,15 +81,21 @@ export default function LoginScreen({ navigation }: any) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [email, password, login]);
+
+  const handleRoleSelect = useCallback((role: Role) => {
+    setSelectedRole(role);
+  }, []);
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAwareScrollViewCompat
+      <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + Spacing["3xl"], paddingBottom: insets.bottom + Spacing["2xl"] },
         ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <ThemedText type="h1" style={styles.title}>
@@ -69,26 +108,14 @@ export default function LoginScreen({ navigation }: any) {
 
         <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
           {roles.map((role) => (
-            <Pressable
+            <RoleTab
               key={role.key}
-              onPress={() => setSelectedRole(role.key)}
-              style={[
-                styles.roleTab,
-                selectedRole === role.key && {
-                  backgroundColor: theme.backgroundDefault,
-                },
-              ]}
-            >
-              <ThemedText
-                type="small"
-                style={[
-                  styles.roleText,
-                  selectedRole === role.key && { color: theme.primary, fontWeight: "600" },
-                ]}
-              >
-                {role.label}
-              </ThemedText>
-            </Pressable>
+              role={role.key}
+              label={role.label}
+              selected={selectedRole === role.key}
+              onSelect={handleRoleSelect}
+              theme={theme}
+            />
           ))}
         </View>
 
@@ -130,7 +157,7 @@ export default function LoginScreen({ navigation }: any) {
             <ThemedText type="link">Sign Up</ThemedText>
           </Pressable>
         </View>
-      </KeyboardAwareScrollViewCompat>
+      </ScrollView>
     </ThemedView>
   );
 }

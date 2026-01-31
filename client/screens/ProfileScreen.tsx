@@ -1,15 +1,54 @@
-import React from "react";
-import { StyleSheet, View, Pressable } from "react-native";
+import React, { useCallback, memo } from "react";
+import { StyleSheet, View, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+
+type MenuItem = {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+};
+
+const MenuItemRow = memo(function MenuItemRow({
+  item,
+  isFirst,
+  isLast,
+  theme,
+}: {
+  item: MenuItem;
+  isFirst: boolean;
+  isLast: boolean;
+  theme: any;
+}) {
+  return (
+    <Pressable
+      onPress={item.onPress}
+      style={({ pressed }) => [
+        styles.menuItem,
+        {
+          backgroundColor: pressed ? theme.backgroundSecondary : theme.backgroundDefault,
+        },
+        isFirst && styles.menuItemFirst,
+        isLast && styles.menuItemLast,
+      ]}
+    >
+      <View style={[styles.menuIconContainer, { backgroundColor: `${theme.primary}10` }]}>
+        <Feather name={item.icon} size={18} color={theme.primary} />
+      </View>
+      <ThemedText type="body" style={styles.menuLabel}>
+        {item.label}
+      </ThemedText>
+      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+    </Pressable>
+  );
+});
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -18,10 +57,10 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const { user, logout } = useAuth();
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await logout();
-  };
+  }, [logout]);
 
   const getRoleLabel = (role: string) => {
     switch (role) {
@@ -36,31 +75,31 @@ export default function ProfileScreen() {
     }
   };
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
-      icon: "user" as const,
+      icon: "user",
       label: "Account Settings",
       onPress: () => {},
     },
     {
-      icon: "bell" as const,
+      icon: "bell",
       label: "Notifications",
       onPress: () => {},
     },
     {
-      icon: "help-circle" as const,
+      icon: "help-circle",
       label: "Help & Support",
       onPress: () => {},
     },
     {
-      icon: "info" as const,
+      icon: "info",
       label: "About",
       onPress: () => {},
     },
   ];
 
   return (
-    <KeyboardAwareScrollViewCompat
+    <ScrollView
       style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.xl,
@@ -68,6 +107,7 @@ export default function ProfileScreen() {
         paddingHorizontal: Spacing.lg,
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
+      showsVerticalScrollIndicator={false}
     >
       <View style={[styles.profileCard, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
         <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
@@ -90,26 +130,13 @@ export default function ProfileScreen() {
 
       <View style={styles.menuSection}>
         {menuItems.map((item, index) => (
-          <Pressable
+          <MenuItemRow
             key={item.label}
-            onPress={item.onPress}
-            style={({ pressed }) => [
-              styles.menuItem,
-              {
-                backgroundColor: pressed ? theme.backgroundSecondary : theme.backgroundDefault,
-              },
-              index === 0 && styles.menuItemFirst,
-              index === menuItems.length - 1 && styles.menuItemLast,
-            ]}
-          >
-            <View style={[styles.menuIconContainer, { backgroundColor: `${theme.primary}10` }]}>
-              <Feather name={item.icon} size={18} color={theme.primary} />
-            </View>
-            <ThemedText type="body" style={styles.menuLabel}>
-              {item.label}
-            </ThemedText>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </Pressable>
+            item={item}
+            isFirst={index === 0}
+            isLast={index === menuItems.length - 1}
+            theme={theme}
+          />
         ))}
       </View>
 
@@ -131,7 +158,7 @@ export default function ProfileScreen() {
       <ThemedText type="small" style={styles.version}>
         QR Ticket Manager v1.0.0
       </ThemedText>
-    </KeyboardAwareScrollViewCompat>
+    </ScrollView>
   );
 }
 

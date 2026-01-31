@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import { StyleSheet, View, Pressable, ActivityIndicator, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -33,14 +33,7 @@ type ScannedResult = {
   alreadyCheckedIn: boolean;
 };
 
-export default function ScannerScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const [result, setResult] = useState<ScannedResult | null>(null);
-  const [error, setError] = useState("");
-
+const ScanLine = memo(function ScanLine({ color }: { color: string }) {
   const scanLinePosition = useSharedValue(0);
 
   useEffect(() => {
@@ -49,11 +42,22 @@ export default function ScannerScreen({ navigation }: any) {
       -1,
       true
     );
-  }, []);
+  }, [scanLinePosition]);
 
   const scanLineStyle = useAnimatedStyle(() => ({
     top: `${scanLinePosition.value * 100}%`,
   }));
+
+  return <Animated.View style={[styles.scanLine, { backgroundColor: color }, scanLineStyle]} />;
+});
+
+export default function ScannerScreen() {
+  const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const [result, setResult] = useState<ScannedResult | null>(null);
+  const [error, setError] = useState("");
 
   const verifyMutation = useMutation({
     mutationFn: async (qrCode: string) => {
@@ -90,36 +94,36 @@ export default function ScannerScreen({ navigation }: any) {
     },
   });
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = useCallback(({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
     setError("");
     verifyMutation.mutate(data);
-  };
+  }, [scanned, verifyMutation]);
 
-  const resetScanner = () => {
+  const resetScanner = useCallback(() => {
     setScanned(false);
     setResult(null);
     setError("");
-  };
+  }, []);
 
-  const handleCheckIn = () => {
+  const handleCheckIn = useCallback(() => {
     if (result?.registration) {
       checkInMutation.mutate({
         registrationId: result.registration.id,
         type: "check_in",
       });
     }
-  };
+  }, [result, checkInMutation]);
 
-  const handleCheckOut = () => {
+  const handleCheckOut = useCallback(() => {
     if (result?.registration) {
       checkInMutation.mutate({
         registrationId: result.registration.id,
         type: "check_out",
       });
     }
-  };
+  }, [result, checkInMutation]);
 
   if (!permission) {
     return (
@@ -176,7 +180,7 @@ export default function ScannerScreen({ navigation }: any) {
             <View style={[styles.corner, styles.cornerTR, { borderColor: theme.primary }]} />
             <View style={[styles.corner, styles.cornerBL, { borderColor: theme.primary }]} />
             <View style={[styles.corner, styles.cornerBR, { borderColor: theme.primary }]} />
-            <Animated.View style={[styles.scanLine, { backgroundColor: theme.primary }, scanLineStyle]} />
+            <ScanLine color={theme.primary} />
           </View>
           <View style={[styles.overlaySide, { backgroundColor: "rgba(0,0,0,0.6)" }]} />
         </View>
