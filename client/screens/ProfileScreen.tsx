@@ -3,7 +3,7 @@ import { StyleSheet, View, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { Feather } from "@expo/vector-icons";
+import { Icon, IconName } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 type MenuItem = {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
 };
@@ -40,12 +40,12 @@ const MenuItemRow = memo(function MenuItemRow({
       ]}
     >
       <View style={[styles.menuIconContainer, { backgroundColor: `${theme.primary}10` }]}>
-        <Feather name={item.icon} size={18} color={theme.primary} />
+        <Icon name={item.icon} size={18} color={theme.primary} />
       </View>
       <ThemedText type="body" style={styles.menuLabel}>
         {item.label}
       </ThemedText>
-      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+      <Icon name="chevron-right" size={20} color={theme.textSecondary} />
     </Pressable>
   );
 });
@@ -149,7 +149,7 @@ export default function ProfileScreen() {
           },
         ]}
       >
-        <Feather name="log-out" size={18} color={theme.error} />
+        <Icon name="log-out" size={18} color={theme.error} />
         <ThemedText type="body" style={{ color: theme.error, fontWeight: "600" }}>
           Log Out
         </ThemedText>

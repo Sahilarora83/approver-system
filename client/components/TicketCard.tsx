@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import QRCode from "react-native-qrcode-svg";
 import Animated, {
   useAnimatedStyle,
@@ -61,19 +61,19 @@ export function TicketCard({
 
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Feather name="user" size={16} color={theme.textSecondary} />
+          <Icon name="user" size={16} color={theme.textSecondary} />
           <ThemedText type="body" style={styles.detailText}>
             {participantName}
           </ThemedText>
         </View>
         <View style={styles.detailRow}>
-          <Feather name="calendar" size={16} color={theme.textSecondary} />
+          <Icon name="calendar" size={16} color={theme.textSecondary} />
           <ThemedText type="body" style={styles.detailText}>
             {date}
           </ThemedText>
         </View>
         <View style={styles.detailRow}>
-          <Feather name="map-pin" size={16} color={theme.textSecondary} />
+          <Icon name="map-pin" size={16} color={theme.textSecondary} />
           <ThemedText type="body" style={styles.detailText}>
             {location}
           </ThemedText>

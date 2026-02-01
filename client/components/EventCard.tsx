@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -61,19 +61,19 @@ export function EventCard({
       </View>
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Feather name="calendar" size={14} color={theme.textSecondary} />
+          <Icon name="calendar" size={14} color={theme.textSecondary} />
           <ThemedText type="small" style={styles.detailText}>
             {date}
           </ThemedText>
         </View>
         <View style={styles.detailRow}>
-          <Feather name="map-pin" size={14} color={theme.textSecondary} />
+          <Icon name="map-pin" size={14} color={theme.textSecondary} />
           <ThemedText type="small" style={styles.detailText}>
             {location}
           </ThemedText>
         </View>
         <View style={styles.detailRow}>
-          <Feather name="users" size={14} color={theme.textSecondary} />
+          <Icon name="users" size={14} color={theme.textSecondary} />
           <ThemedText type="small" style={styles.detailText}>
             {registrations} registrations
           </ThemedText>

@@ -5,8 +5,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
-import * as Font from "expo-font";
-import { Feather, Ionicons, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
@@ -62,14 +60,9 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        await Font.loadAsync({
-          ...Feather.font,
-          ...Ionicons.font,
-          ...MaterialIcons.font,
-          ...MaterialCommunityIcons.font,
-        });
+        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (e) {
-        console.warn("Error loading fonts:", e);
+        console.warn("App preparation error:", e);
       } finally {
         setAppIsReady(true);
       }

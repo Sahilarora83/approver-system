@@ -1,12 +1,12 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Icon, IconName } from "@/components/Icon";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 interface StatCardProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
   label: string;
   value: string | number;
   color?: string;
@@ -19,7 +19,7 @@ export function StatCard({ icon, label, value, color }: StatCardProps) {
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
       <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
-        <Feather name={icon} size={20} color={iconColor} />
+        <Icon name={icon} size={20} color={iconColor} />
       </View>
       <ThemedText type="h3" style={styles.value}>
         {value}

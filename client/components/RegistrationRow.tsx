@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -66,7 +66,7 @@ export function RegistrationRow({
                 onPress={handleApprove}
                 style={[styles.actionButton, { backgroundColor: `${theme.success}15` }]}
               >
-                <Feather name="check" size={18} color={theme.success} />
+                <Icon name="check" size={18} color={theme.success} />
               </Pressable>
             ) : null}
             {onReject ? (
@@ -74,7 +74,7 @@ export function RegistrationRow({
                 onPress={handleReject}
                 style={[styles.actionButton, { backgroundColor: `${theme.error}15` }]}
               >
-                <Feather name="x" size={18} color={theme.error} />
+                <Icon name="x" size={18} color={theme.error} />
               </Pressable>
             ) : null}
           </View>

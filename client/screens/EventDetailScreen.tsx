@@ -3,7 +3,7 @@ import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Pressabl
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { ThemedText } from "@/components/ThemedText";
@@ -101,13 +101,13 @@ export default function EventDetailScreen({ route, navigation }: any) {
       </ThemedText>
       <View style={styles.eventMeta}>
         <View style={styles.metaRow}>
-          <Feather name="calendar" size={16} color={theme.textSecondary} />
+          <Icon name="calendar" size={16} color={theme.textSecondary} />
           <ThemedText type="body" style={styles.metaText}>
             {event?.startDate ? formatDate(event.startDate) : "Date TBD"}
           </ThemedText>
         </View>
         <View style={styles.metaRow}>
-          <Feather name="map-pin" size={16} color={theme.textSecondary} />
+          <Icon name="map-pin" size={16} color={theme.textSecondary} />
           <ThemedText type="body" style={styles.metaText}>
             {event?.location || "Location TBD"}
           </ThemedText>
@@ -119,7 +119,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
           onPress={handleCopyLink}
           style={[styles.actionButton, { backgroundColor: theme.backgroundDefault }]}
         >
-          <Feather name="link" size={18} color={theme.primary} />
+          <Icon name="link" size={18} color={theme.primary} />
           <ThemedText type="small" style={{ color: theme.primary }}>
             Copy Link
           </ThemedText>
@@ -128,7 +128,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
           onPress={handleShare}
           style={[styles.actionButton, { backgroundColor: theme.backgroundDefault }]}
         >
-          <Feather name="share-2" size={18} color={theme.primary} />
+          <Icon name="share-2" size={18} color={theme.primary} />
           <ThemedText type="small" style={{ color: theme.primary }}>
             Share
           </ThemedText>

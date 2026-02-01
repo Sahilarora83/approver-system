@@ -4,7 +4,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import { ThemedText } from "@/components/ThemedText";
 import { EventCard } from "@/components/EventCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -37,7 +37,7 @@ export default function EventsListScreen({ navigation }: any) {
         onPress={() => navigation.navigate("CreateEvent")}
         style={[styles.addButton, { backgroundColor: theme.primary }]}
       >
-        <Feather name="plus" size={20} color="#fff" />
+        <Icon name="plus" size={20} color="#fff" />
       </Pressable>
     </View>
   );

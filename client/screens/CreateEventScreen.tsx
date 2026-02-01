@@ -3,7 +3,7 @@ import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform } 
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
-import { Feather } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -48,7 +48,7 @@ const FieldRow = memo(function FieldRow({
       </View>
       {index >= 3 ? (
         <Pressable onPress={() => onRemove(field.id)} style={styles.removeButton}>
-          <Feather name="trash-2" size={18} color={theme.error} />
+          <Icon name="trash-2" size={18} color={theme.error} />
         </Pressable>
       ) : null}
     </View>
@@ -180,7 +180,7 @@ export default function CreateEventScreen({ navigation }: any) {
             Date & Time
           </ThemedText>
           <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <Feather name="calendar" size={18} color={theme.textSecondary} />
+            <Icon name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
                 Start Date
@@ -190,7 +190,7 @@ export default function CreateEventScreen({ navigation }: any) {
           </View>
 
           <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <Feather name="calendar" size={18} color={theme.textSecondary} />
+            <Icon name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
                 End Date
@@ -223,7 +223,7 @@ export default function CreateEventScreen({ navigation }: any) {
                 },
               ]}
             >
-              {requiresApproval ? <Feather name="check" size={14} color="#fff" /> : null}
+              {requiresApproval ? <Icon name="check" size={14} color="#fff" /> : null}
             </View>
           </Pressable>
         </View>
@@ -234,7 +234,7 @@ export default function CreateEventScreen({ navigation }: any) {
               Registration Form Fields
             </ThemedText>
             <Pressable onPress={addField} style={[styles.addFieldButton, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="plus" size={16} color={theme.primary} />
+              <Icon name="plus" size={16} color={theme.primary} />
               <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
                 Add Field
               </ThemedText>
