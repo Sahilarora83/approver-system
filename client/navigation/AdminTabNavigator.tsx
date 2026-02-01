@@ -1,12 +1,12 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { HeaderTitle } from "@/components/HeaderTitle";
+import { TabIcon } from "@/components/TabIcon";
 
 import AdminDashboardScreen from "@/screens/AdminDashboardScreen";
 import EventsListScreen from "@/screens/EventsListScreen";
@@ -73,39 +73,73 @@ function ProfileStack() {
 export default function AdminTabNavigator() {
   const { theme, isDark } = useTheme();
 
+  const renderDashboardIcon = useCallback(
+    ({ color, size }: { color: string; size: number }) => (
+      <TabIcon name="home" color={color} size={size} />
+    ),
+    []
+  );
+
+  const renderEventsIcon = useCallback(
+    ({ color, size }: { color: string; size: number }) => (
+      <TabIcon name="calendar" color={color} size={size} />
+    ),
+    []
+  );
+
+  const renderScanIcon = useCallback(
+    ({ color, size }: { color: string; size: number }) => (
+      <TabIcon name="camera" color={color} size={size} />
+    ),
+    []
+  );
+
+  const renderProfileIcon = useCallback(
+    ({ color, size }: { color: string; size: number }) => (
+      <TabIcon name="user" color={color} size={size} />
+    ),
+    []
+  );
+
+  const tabBarBackground = useCallback(
+    () =>
+      Platform.OS === "ios" ? (
+        <BlurView
+          intensity={100}
+          tint={isDark ? "dark" : "light"}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null,
+    [isDark]
+  );
+
+  const screenOptions = useMemo(
+    () => ({
+      tabBarActiveTintColor: theme.tabIconSelected,
+      tabBarInactiveTintColor: theme.tabIconDefault,
+      tabBarStyle: {
+        position: "absolute" as const,
+        backgroundColor: Platform.select({
+          ios: "transparent",
+          android: theme.backgroundRoot,
+        }),
+        borderTopWidth: 0,
+        elevation: 0,
+      },
+      tabBarBackground,
+      headerShown: false,
+    }),
+    [theme, tabBarBackground]
+  );
+
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: theme.tabIconSelected,
-        tabBarInactiveTintColor: theme.tabIconDefault,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: Platform.select({
-            ios: "transparent",
-            android: theme.backgroundRoot,
-          }),
-          borderTopWidth: 0,
-          elevation: 0,
-        },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null,
-        headerShown: false,
-      }}
-    >
+    <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen
         name="DashboardTab"
         component={DashboardStack}
         options={{
           title: "Dashboard",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
-          ),
+          tabBarIcon: renderDashboardIcon,
         }}
       />
       <Tab.Screen
@@ -113,9 +147,7 @@ export default function AdminTabNavigator() {
         component={EventsStack}
         options={{
           title: "Events",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="calendar" size={size} color={color} />
-          ),
+          tabBarIcon: renderEventsIcon,
         }}
       />
       <Tab.Screen
@@ -123,9 +155,7 @@ export default function AdminTabNavigator() {
         component={ScanStack}
         options={{
           title: "Scan",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="camera" size={size} color={color} />
-          ),
+          tabBarIcon: renderScanIcon,
         }}
       />
       <Tab.Screen
@@ -133,9 +163,7 @@ export default function AdminTabNavigator() {
         component={ProfileStack}
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
-          ),
+          tabBarIcon: renderProfileIcon,
         }}
       />
     </Tab.Navigator>
