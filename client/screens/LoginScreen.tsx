@@ -1,16 +1,17 @@
 import React, { useState, useCallback, memo } from "react";
-import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
-type Role = "admin" | "participant" | "verifier";
+type Role = "admin" | "participant";
 
 const RoleTab = memo(function RoleTab({
   role,
@@ -27,17 +28,24 @@ const RoleTab = memo(function RoleTab({
 }) {
   return (
     <Pressable
-      onPress={() => onSelect(role)}
+      onPress={() => {
+        onSelect(role);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }}
       style={[
         styles.roleTab,
-        selected && { backgroundColor: theme.backgroundDefault },
+        selected && {
+          backgroundColor: theme.backgroundDefault,
+          ...Shadows.sm
+        },
       ]}
     >
       <ThemedText
         type="small"
         style={[
           styles.roleText,
-          selected && { color: theme.primary, fontWeight: "600" },
+          selected && { color: theme.primary, fontWeight: "700" },
+          !selected && { opacity: 0.6 }
         ]}
       >
         {label}
@@ -60,7 +68,6 @@ export default function LoginScreen({ navigation }: any) {
   const roles: { key: Role; label: string }[] = [
     { key: "admin", label: "Admin" },
     { key: "participant", label: "Participant" },
-    { key: "verifier", label: "Verifier" },
   ];
 
   const handleLogin = useCallback(async () => {
@@ -88,7 +95,12 @@ export default function LoginScreen({ navigation }: any) {
   }, []);
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <LinearGradient
+        colors={[theme.primary + '20', 'transparent', theme.primary + '05']}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -97,68 +109,85 @@ export default function LoginScreen({ navigation }: any) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
+        <Animated.View entering={FadeInUp.duration(800).springify()} style={styles.header}>
+          <View style={[styles.logoCircle, { backgroundColor: theme.primary }]}>
+            <ThemedText style={styles.logoText}>G</ThemedText>
+          </View>
           <ThemedText type="h1" style={styles.title}>
             Welcome Back
           </ThemedText>
           <ThemedText type="body" style={styles.subtitle}>
-            Sign in to manage your events and tickets
+            Sign in to your account
           </ThemedText>
-        </View>
+        </Animated.View>
 
-        <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
-          {roles.map((role) => (
-            <RoleTab
-              key={role.key}
-              role={role.key}
-              label={role.label}
-              selected={selectedRole === role.key}
-              onSelect={handleRoleSelect}
-              theme={theme}
+        <Animated.View entering={FadeInDown.delay(200).duration(800).springify()} style={styles.formSection}>
+          <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            {roles.map((role) => (
+              <RoleTab
+                key={role.key}
+                role={role.key}
+                label={role.label}
+                selected={selectedRole === role.key}
+                onSelect={handleRoleSelect}
+                theme={theme}
+              />
+            ))}
+          </View>
+
+          <View style={styles.form}>
+            <Input
+              label="EMAIL ADDRESS"
+              placeholder="name@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              style={styles.input}
             />
-          ))}
-        </View>
+            <Input
+              label="PASSWORD"
+              placeholder="••••••••"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password"
+              style={styles.input}
+            />
 
-        <View style={styles.form}>
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
-          />
+            {error ? (
+              <Animated.View entering={FadeInDown}>
+                <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
+                  {error}
+                </ThemedText>
+              </Animated.View>
+            ) : null}
 
-          {error ? (
-            <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
-              {error}
-            </ThemedText>
-          ) : null}
+            <Button
+              onPress={handleLogin}
+              disabled={isLoading}
+              style={styles.button}
+              textStyle={{ fontWeight: '800', letterSpacing: 1 }}
+            >
+              {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "SIGN IN"}
+            </Button>
+          </View>
+        </Animated.View>
 
-          <Button onPress={handleLogin} disabled={isLoading} style={styles.button}>
-            {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "Sign In"}
-          </Button>
-        </View>
-
-        <View style={styles.footer}>
+        <Animated.View entering={FadeInDown.delay(400).duration(800).springify()} style={styles.footer}>
           <ThemedText type="body" style={styles.footerText}>
-            Don't have an account?{" "}
+            New here?{" "}
           </ThemedText>
-          <Pressable onPress={() => navigation.navigate("Signup")}>
-            <ThemedText type="link">Sign Up</ThemedText>
+          <Pressable onPress={() => {
+            navigation.navigate("Signup");
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }}>
+            <ThemedText type="link" style={{ fontWeight: '700' }}>Create Account</ThemedText>
           </Pressable>
-        </View>
+        </Animated.View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -167,51 +196,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing["2xl"],
+    paddingHorizontal: 24,
     flexGrow: 1,
+    justifyContent: 'center',
   },
   header: {
     marginBottom: Spacing["3xl"],
     alignItems: "center",
   },
+  logoCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+    ...Shadows.md,
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '900',
+  },
   title: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     textAlign: "center",
+    fontWeight: '900',
   },
   subtitle: {
-    opacity: 0.7,
+    opacity: 0.6,
     textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  formSection: {
+    width: '100%',
   },
   roleContainer: {
     flexDirection: "row",
-    borderRadius: BorderRadius.md,
-    padding: Spacing.xs,
-    marginBottom: Spacing["2xl"],
+    borderRadius: BorderRadius.lg,
+    padding: 6,
+    marginBottom: Spacing.xl,
+    ...Shadows.sm,
   },
   roleTab: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: 12,
     alignItems: "center",
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
   },
   roleText: {
-    fontWeight: "500",
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   form: {
-    gap: Spacing.lg,
+    gap: Spacing.xl,
+  },
+  input: {
+    height: 56,
+    borderRadius: BorderRadius.md,
   },
   error: {
     textAlign: "center",
+    fontWeight: '600',
   },
   button: {
     marginTop: Spacing.md,
+    height: 56,
+    borderRadius: BorderRadius.md,
+    ...Shadows.md,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: 'center',
     marginTop: Spacing["3xl"],
   },
   footerText: {
-    opacity: 0.7,
+    opacity: 0.5,
   },
 });

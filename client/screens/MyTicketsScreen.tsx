@@ -9,16 +9,45 @@ import { EmptyState } from "@/components/EmptyState";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/query-client";
 
 export default function MyTicketsScreen({ navigation }: any) {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { user } = useAuth();
 
-  const { data: tickets, isLoading, refetch } = useQuery({
-    queryKey: ["/api/my-tickets"],
+  const { data: tickets, isLoading, refetch, error } = useQuery<any[]>({
+    queryKey: ["/api/my-tickets", user?.email],
+    queryFn: async () => {
+      const url = user?.email
+        ? `/api/my-tickets?email=${encodeURIComponent(user.email)}`
+        : '/api/my-tickets';
+
+      console.log('[MyTickets] Fetching from:', url);
+      const res = await apiRequest("GET", url);
+      const data = await res.json();
+      console.log('[MyTickets] Received tickets:', data);
+      return data;
+    },
+    enabled: !!user?.email,
   });
+
+  React.useEffect(() => {
+    console.log('[MyTickets] Tickets data:', tickets);
+    console.log('[MyTickets] Is loading:', isLoading);
+    console.log('[MyTickets] Error:', error);
+  }, [tickets, isLoading, error]);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('[MyTickets] Screen focused, refetching...');
+      refetch();
+    });
+    return unsubscribe;
+  }, [navigation, refetch]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
@@ -64,7 +93,7 @@ export default function MyTicketsScreen({ navigation }: any) {
         flexGrow: 1,
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
-      data={tickets || []}
+      data={(tickets || []).filter((t: any) => t.status === 'approved' || t.status === 'checked_in' || t.status === 'checked_out')}
       keyExtractor={(item: any) => item.id}
       ListHeaderComponent={renderHeader}
       ListEmptyComponent={renderEmpty}

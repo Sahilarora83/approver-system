@@ -1,6 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -22,7 +23,7 @@ function setupCors(app: express.Application) {
     }
 
     if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      process.env.REPLIT_DOMAINS.split(",").forEach((d: string) => {
         origins.add(`https://${d.trim()}`);
       });
     }
@@ -32,7 +33,8 @@ function setupCors(app: express.Application) {
     // Allow localhost origins for Expo web development (any port)
     const isLocalhost =
       origin?.startsWith("http://localhost:") ||
-      origin?.startsWith("http://127.0.0.1:");
+      origin?.startsWith("http://127.0.0.1:") ||
+      origin?.startsWith("http://192.168.");
 
     if (origin && (origins.has(origin) || isLocalhost)) {
       res.header("Access-Control-Allow-Origin", origin);
@@ -53,15 +55,8 @@ function setupCors(app: express.Application) {
 }
 
 function setupBodyParsing(app: express.Application) {
-  app.use(
-    express.json({
-      verify: (req, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
-
-  app.use(express.urlencoded({ extended: false }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 }
 
 function setupRequestLogging(app: express.Application) {
@@ -199,6 +194,7 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   log("Expo routing: Checking expo-platform header on / and /manifest");
@@ -232,6 +228,66 @@ function setupErrorHandler(app: express.Application) {
 
   configureExpoAndLanding(app);
 
+  // Public registration page route - redirect to app or show simple page
+  app.get("/register/:link", async (req, res) => {
+    const { link } = req.params;
+
+    // Try to get event details
+    const event = await storage.getEventByPublicLink(link);
+
+    if (!event) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Event Not Found</title>
+            <style>
+              body { font-family: system-ui; padding: 40px; text-align: center; background: #f5f5f5; }
+              .container { max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+              h1 { color: #e74c3c; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>❌ Event Not Found</h1>
+              <p>This event link is invalid or has been removed.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    // Load and customize Luma-style template
+    const templatePath = path.resolve(__dirname, "..", "server", "templates", "register.html");
+    let html = fs.readFileSync(templatePath, "utf-8");
+
+    const formattedDate = new Date(event.startDate).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    const approvalBadge = event.requiresApproval ? `
+      <div class="approval-badge">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+        </svg>
+        Approval Required - Your registration will be reviewed
+      </div>
+    ` : '';
+
+    html = html
+      .replace(/{{EVENT_TITLE}}/g, event.title)
+      .replace(/{{EVENT_DESCRIPTION}}/g, event.description || '')
+      .replace(/{{EVENT_DATE}}/g, formattedDate)
+      .replace(/{{EVENT_LOCATION}}/g, event.location || 'TBD')
+      .replace(/{{APPROVAL_BADGE}}/g, approvalBadge)
+      .replace(/{{DEEP_LINK}}/g, `qrticket://register/${link}`);
+
+    res.send(html);
+  });
+
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);
@@ -241,10 +297,12 @@ function setupErrorHandler(app: express.Application) {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`express server serving on port ${port}`);
+      log("----------------------------------------------------------------");
+      log("DATABASE: Initialized with Supabase Storage");
+      log("----------------------------------------------------------------");
     },
   );
 })();

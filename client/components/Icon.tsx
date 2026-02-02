@@ -22,6 +22,7 @@ export type IconName =
   | "help-circle"
   | "info"
   | "log-out"
+  | "log-in"
   | "plus"
   | "share"
   | "settings"
@@ -36,13 +37,22 @@ export type IconName =
   | "refresh"
   | "qr-code"
   | "share-2"
-  | "trash-2";
+  | "share-2"
+  | "trash-2"
+  | "chevron-down"
+  | "image"
+  | "shield"
+  | "moon"
+  | "lock";
+
+import { StyleProp, ViewStyle } from "react-native";
 
 interface IconProps {
   name: IconName;
   size?: number;
   color?: string;
   strokeWidth?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const Icon = memo(function Icon({
@@ -50,6 +60,7 @@ export const Icon = memo(function Icon({
   size = 24,
   color = "#000000",
   strokeWidth = 2,
+  style,
 }: IconProps) {
   const icons: Record<IconName, React.ReactNode> = {
     home: (
@@ -306,6 +317,16 @@ export const Icon = memo(function Icon({
         <Circle cx="12" cy="10" r="3" stroke={color} strokeWidth={strokeWidth} fill="none" />
       </>
     ),
+    shield: (
+      <Path
+        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    ),
     check: (
       <Polyline
         points="20,6 9,17 4,12"
@@ -518,6 +539,35 @@ export const Icon = memo(function Icon({
           x1="21"
           y1="12"
           x2="9"
+          y2="12"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+      </>
+    ),
+    "log-in": (
+      <>
+        <Path
+          d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Polyline
+          points="10,17 15,12 10,7"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Line
+          x1="15"
+          y1="12"
+          x2="3"
           y2="12"
           stroke={color}
           strokeWidth={strokeWidth}
@@ -744,6 +794,41 @@ export const Icon = memo(function Icon({
         />
       </>
     ),
+    moon: (
+      <Path
+        d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    ),
+    lock: (
+      <>
+        <Rect
+          x="3"
+          y="11"
+          width="18"
+          height="11"
+          rx="2"
+          ry="2"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Path
+          d="M7 11V7a5 5 0 0 1 10 0v4"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </>
+    ),
     refresh: (
       <>
         <Polyline
@@ -830,10 +915,27 @@ export const Icon = memo(function Icon({
         <Line x1="14" y1="11" x2="14" y2="17" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
       </>
     ),
+    "chevron-down": (
+      <Polyline
+        points="6 9 12 15 18 9"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    ),
+    image: (
+      <>
+        <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke={color} strokeWidth={strokeWidth} fill="none" />
+        <Circle cx="8.5" cy="8.5" r="1.5" stroke={color} strokeWidth={strokeWidth} fill="none" />
+        <Polyline points="21 15 16 10 5 21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </>
+    ),
   };
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
       {icons[name]}
     </Svg>
   );

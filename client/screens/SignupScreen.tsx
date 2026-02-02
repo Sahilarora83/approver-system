@@ -1,16 +1,17 @@
 import React, { useState, useCallback, memo } from "react";
-import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
-type Role = "admin" | "participant" | "verifier";
+type Role = "admin" | "participant";
 
 const RoleTab = memo(function RoleTab({
   role,
@@ -27,17 +28,24 @@ const RoleTab = memo(function RoleTab({
 }) {
   return (
     <Pressable
-      onPress={() => onSelect(role)}
+      onPress={() => {
+        onSelect(role);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }}
       style={[
         styles.roleTab,
-        selected && { backgroundColor: theme.backgroundDefault },
+        selected && {
+          backgroundColor: theme.backgroundDefault,
+          ...Shadows.sm
+        },
       ]}
     >
       <ThemedText
         type="small"
         style={[
           styles.roleText,
-          selected && { color: theme.primary, fontWeight: "600" },
+          selected && { color: theme.primary, fontWeight: "700" },
+          !selected && { opacity: 0.6 }
         ]}
       >
         {label}
@@ -62,7 +70,6 @@ export default function SignupScreen({ navigation }: any) {
   const roles: { key: Role; label: string }[] = [
     { key: "admin", label: "Admin" },
     { key: "participant", label: "Participant" },
-    { key: "verifier", label: "Verifier" },
   ];
 
   const handleSignup = useCallback(async () => {
@@ -100,93 +107,114 @@ export default function SignupScreen({ navigation }: any) {
   }, []);
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <LinearGradient
+        colors={[theme.primary + '15', 'transparent', theme.primary + '03']}
+        style={StyleSheet.absoluteFill}
+      />
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + Spacing["3xl"], paddingBottom: insets.bottom + Spacing["2xl"] },
+          { paddingTop: insets.top + Spacing["xl"], paddingBottom: insets.bottom + Spacing["2xl"] },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
+        <Animated.View entering={FadeInUp.duration(800).springify()} style={styles.header}>
           <ThemedText type="h1" style={styles.title}>
             Create Account
           </ThemedText>
           <ThemedText type="body" style={styles.subtitle}>
-            Join to create events or register for tickets
+            Join the global event community
           </ThemedText>
-        </View>
+        </Animated.View>
 
-        <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
-          {roles.map((role) => (
-            <RoleTab
-              key={role.key}
-              role={role.key}
-              label={role.label}
-              selected={selectedRole === role.key}
-              onSelect={handleRoleSelect}
-              theme={theme}
+        <Animated.View entering={FadeInDown.delay(200).duration(800).springify()} style={styles.formSection}>
+          <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            {roles.map((role) => (
+              <RoleTab
+                key={role.key}
+                role={role.key}
+                label={role.label}
+                selected={selectedRole === role.key}
+                onSelect={handleRoleSelect}
+                theme={theme}
+              />
+            ))}
+          </View>
+
+          <View style={styles.form}>
+            <Input
+              label="FULL NAME"
+              placeholder="John Doe"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              autoComplete="name"
+              style={styles.input}
             />
-          ))}
-        </View>
+            <Input
+              label="EMAIL ADDRESS"
+              placeholder="name@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              style={styles.input}
+            />
+            <Input
+              label="PASSWORD"
+              placeholder="Min 6 characters"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              style={styles.input}
+            />
+            <Input
+              label="CONFIRM PASSWORD"
+              placeholder="Repeat password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              style={styles.input}
+            />
 
-        <View style={styles.form}>
-          <Input
-            label="Full Name"
-            placeholder="Enter your name"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            autoComplete="name"
-          />
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
-          <Input
-            label="Password"
-            placeholder="Create a password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="new-password"
-          />
-          <Input
-            label="Confirm Password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            autoComplete="new-password"
-          />
+            {error ? (
+              <Animated.View entering={FadeInDown}>
+                <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
+                  {error}
+                </ThemedText>
+              </Animated.View>
+            ) : null}
 
-          {error ? (
-            <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
-              {error}
-            </ThemedText>
-          ) : null}
+            <Button
+              onPress={handleSignup}
+              disabled={isLoading}
+              style={styles.button}
+              textStyle={{ fontWeight: '800', letterSpacing: 1 }}
+            >
+              {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "JOIN NOW"}
+            </Button>
+          </View>
+        </Animated.View>
 
-          <Button onPress={handleSignup} disabled={isLoading} style={styles.button}>
-            {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "Create Account"}
-          </Button>
-        </View>
-
-        <View style={styles.footer}>
+        <Animated.View entering={FadeInDown.delay(400).duration(800).springify()} style={styles.footer}>
           <ThemedText type="body" style={styles.footerText}>
             Already have an account?{" "}
           </ThemedText>
-          <Pressable onPress={() => navigation.goBack()}>
-            <ThemedText type="link">Sign In</ThemedText>
+          <Pressable onPress={() => {
+            navigation.goBack();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }}>
+            <ThemedText type="link" style={{ fontWeight: '700' }}>Sign In</ThemedText>
           </Pressable>
-        </View>
+        </Animated.View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -195,51 +223,67 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing["2xl"],
+    paddingHorizontal: 24,
     flexGrow: 1,
   },
   header: {
-    marginBottom: Spacing["3xl"],
+    marginBottom: Spacing["2xl"],
     alignItems: "center",
   },
   title: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     textAlign: "center",
+    fontWeight: '900',
   },
   subtitle: {
-    opacity: 0.7,
+    opacity: 0.6,
     textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  formSection: {
+    width: '100%',
   },
   roleContainer: {
     flexDirection: "row",
-    borderRadius: BorderRadius.md,
-    padding: Spacing.xs,
-    marginBottom: Spacing["2xl"],
+    borderRadius: BorderRadius.lg,
+    padding: 6,
+    marginBottom: Spacing.xl,
+    ...Shadows.sm,
   },
   roleTab: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: 12,
     alignItems: "center",
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
   },
   roleText: {
-    fontWeight: "500",
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   form: {
     gap: Spacing.lg,
   },
+  input: {
+    height: 56,
+    borderRadius: BorderRadius.md,
+  },
   error: {
     textAlign: "center",
+    fontWeight: '600',
   },
   button: {
     marginTop: Spacing.md,
+    height: 56,
+    borderRadius: BorderRadius.md,
+    ...Shadows.md,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: Spacing["3xl"],
+    alignItems: 'center',
+    marginTop: Spacing["2xl"],
   },
   footerText: {
-    opacity: 0.7,
+    opacity: 0.5,
   },
 });

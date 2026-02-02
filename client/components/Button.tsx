@@ -15,7 +15,9 @@ interface ButtonProps {
   onPress?: () => void;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<any>;
   disabled?: boolean;
+  icon?: ReactNode;
 }
 
 const springConfig: WithSpringConfig = {
@@ -32,7 +34,9 @@ export function Button({
   onPress,
   children,
   style,
+  textStyle,
   disabled = false,
+  icon,
 }: ButtonProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -69,9 +73,10 @@ export function Button({
         animatedStyle,
       ]}
     >
+      {icon && <>{icon}</>}
       <ThemedText
         type="body"
-        style={[styles.buttonText, { color: theme.buttonText }]}
+        style={[styles.buttonText, { color: theme.buttonText, marginLeft: icon ? 8 : 0 }, textStyle]}
       >
         {children}
       </ThemedText>
@@ -83,6 +88,7 @@ const styles = StyleSheet.create({
   button: {
     height: Spacing.buttonHeight,
     borderRadius: BorderRadius.full,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },

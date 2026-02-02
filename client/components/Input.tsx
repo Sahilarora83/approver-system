@@ -9,8 +9,9 @@ interface InputProps extends TextInputProps {
   error?: string;
 }
 
-export function Input({ label, error, style, ...props }: InputProps) {
+export function Input({ label, error, style, onFocus, onBlur, ...props }: InputProps) {
   const { theme } = useTheme();
+  const [isFocused, setIsFocused] = React.useState(false);
 
   return (
     <View style={styles.container}>
@@ -24,12 +25,29 @@ export function Input({ label, error, style, ...props }: InputProps) {
           styles.input,
           {
             backgroundColor: theme.backgroundDefault,
-            borderColor: error ? theme.error : theme.border,
+            borderColor: error
+              ? theme.error
+              : isFocused
+                ? theme.primary
+                : theme.border,
+            borderWidth: isFocused ? 1.5 : 1,
             color: theme.text,
+            shadowColor: isFocused ? theme.primary : 'transparent',
+            shadowOpacity: isFocused ? 0.1 : 0,
+            shadowRadius: 4,
+            elevation: isFocused ? 2 : 0,
           },
           style,
         ]}
         placeholderTextColor={theme.textSecondary}
+        onFocus={(e) => {
+          setIsFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setIsFocused(false);
+          onBlur?.(e);
+        }}
         {...props}
       />
       {error ? (

@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator } from "react-native";
+import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Pressable } from "react-native";
+import { Icon } from "@/components/Icon";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +12,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing } from "@/constants/theme";
+import { Event } from "@shared/schema";
+
+type AdminStats = {
+  totalEvents: number;
+  totalRegistrations: number;
+  totalCheckedIn: number;
+  totalPending: number;
+};
 
 export default function AdminDashboardScreen({ navigation }: any) {
   const headerHeight = useHeaderHeight();
@@ -19,12 +28,14 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const { theme } = useTheme();
   const { user } = useAuth();
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
+    staleTime: 60000,
   });
 
-  const { data: events, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
+  const { data: events, isLoading: eventsLoading, refetch: refetchEvents } = useQuery<(Event & { registrationCount: number })[]>({
     queryKey: ["/api/events"],
+    staleTime: 60000,
   });
 
   const isLoading = statsLoading || eventsLoading;
@@ -33,9 +44,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
     await Promise.all([refetchStats(), refetchEvents()]);
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", {
+  const formatDate = (date: string | Date) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -44,12 +55,25 @@ export default function AdminDashboardScreen({ navigation }: any) {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <ThemedText type="h2" style={styles.greeting}>
-        Welcome, {user?.name?.split(" ")[0] || "Admin"}
-      </ThemedText>
-      <ThemedText type="body" style={styles.subtitle}>
-        Here's your event overview
-      </ThemedText>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="h2" style={styles.greeting}>
+            Welcome, {user?.name?.split(" ")[0] || "Admin"}
+          </ThemedText>
+          <ThemedText type="body" style={styles.subtitle}>
+            Here's your event overview
+          </ThemedText>
+        </View>
+        <Pressable
+          onPress={() => navigation.navigate("Notifications")}
+          style={({ pressed }) => [
+            styles.notificationButton,
+            { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.7 : 1 }
+          ]}
+        >
+          <Icon name="bell" size={22} color={theme.text} />
+        </Pressable>
+      </View>
 
       <View style={styles.statsRow}>
         <StatCard
@@ -159,5 +183,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: Spacing.lg,
     marginBottom: Spacing.md,
+  },
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

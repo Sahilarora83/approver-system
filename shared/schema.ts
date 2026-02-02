@@ -9,6 +9,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name").notNull(),
   role: text("role").notNull().default("participant"),
+  bio: text("bio"),
+  profileImage: text("profile_image"),
+  pushToken: text("push_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -24,6 +27,9 @@ export const events = pgTable("events", {
   checkInEnabled: boolean("check_in_enabled").default(true),
   formFields: jsonb("form_fields").default([]),
   publicLink: text("public_link"),
+  coverImage: text("cover_image"),
+  hostedBy: text("hosted_by"),
+  socialLinks: jsonb("social_links").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -57,6 +63,37 @@ export const formTemplates = pgTable("form_templates", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const follows = pgTable("follows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  followerId: varchar("follower_id").notNull().references(() => users.id),
+  followingId: varchar("following_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  type: text("type").notNull(),
+  relatedId: text("related_id"),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const broadcasts = pgTable("broadcasts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  organizerId: varchar("organizer_id").notNull().references(() => users.id),
+  title: text("title"),
+  message: text("message").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
@@ -88,6 +125,8 @@ export type Event = typeof events.$inferSelect;
 export type Registration = typeof registrations.$inferSelect;
 export type CheckIn = typeof checkIns.$inferSelect;
 export type FormTemplate = typeof formTemplates.$inferSelect;
+export type Follow = typeof follows.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 
 export type FormField = {
   id: string;

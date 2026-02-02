@@ -1,10 +1,12 @@
-import React, { useState, useCallback, memo } from "react";
-import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform } from "react-native";
+import React, { useState, useCallback, memo, useEffect } from "react";
+import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform, Switch, Image, Alert, LogBox } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
@@ -12,6 +14,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 type FormField = {
   id: string;
@@ -31,20 +34,51 @@ const FieldRow = memo(function FieldRow({
   field,
   index,
   onRemove,
+  onUpdate,
   theme,
 }: {
   field: FormField;
   index: number;
   onRemove: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<FormField>) => void;
   theme: any;
 }) {
   return (
     <View style={[styles.fieldRow, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
       <View style={styles.fieldInfo}>
-        <ThemedText type="body">{field.label}</ThemedText>
-        <ThemedText type="small" style={styles.fieldType}>
-          {field.type} {field.required ? "(required)" : "(optional)"}
-        </ThemedText>
+        <View style={{ marginBottom: 10 }}>
+          <ThemedText type="small" style={{ marginBottom: 4 }}>Label</ThemedText>
+          <Input
+            value={field.label}
+            onChangeText={(text) => onUpdate(field.id, { label: text })}
+            placeholder="Field Label"
+            style={{ padding: 8, height: 40 }}
+          />
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ThemedText type="small">Required</ThemedText>
+            <Switch
+              value={field.required}
+              onValueChange={(val) => onUpdate(field.id, { required: val })}
+              trackColor={{ false: theme.border, true: theme.primary }}
+            />
+          </View>
+
+          {/* Simple Type Toggler for demo */}
+          <Pressable
+            onPress={() => {
+              const types: FormField['type'][] = ['text', 'number', 'email', 'phone', 'checkbox'];
+              const nextIndex = (types.indexOf(field.type) + 1) % types.length;
+              onUpdate(field.id, { type: types[nextIndex] });
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4, borderWidth: 1, borderColor: theme.border, borderRadius: 4 }}
+          >
+            <ThemedText type="small">{field.type.toUpperCase()}</ThemedText>
+            <Icon name="chevron-down" size={14} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
       {index >= 3 ? (
         <Pressable onPress={() => onRemove(field.id)} style={styles.removeButton}>
@@ -55,24 +89,65 @@ const FieldRow = memo(function FieldRow({
   );
 });
 
-export default function CreateEventScreen({ navigation }: any) {
+type Host = {
+  id: string;
+  name: string;
+  instagram: string;
+  twitter: string;
+  linkedin: string;
+};
+
+export default function CreateEventScreen({ navigation, route }: any) {
+  const { event } = route.params || {};
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [requiresApproval, setRequiresApproval] = useState(false);
-  const [formFields, setFormFields] = useState<FormField[]>(defaultFields);
+  useEffect(() => {
+    LogBox.ignoreLogs([/VirtualizedLists should never be nested/]);
+  }, []);
+
+  const [title, setTitle] = useState(event?.title || "");
+  const [description, setDescription] = useState(event?.description || "");
+  const [location, setLocation] = useState(event?.location || "");
+  const [coverImage, setCoverImage] = useState(event?.coverImage || "");
+
+  // Initialize hosts from event data
+  const [hosts, setHosts] = useState<Host[]>(() => {
+    if (event?.socialLinks && Array.isArray(event.socialLinks)) {
+      return event.socialLinks;
+    }
+    // Legacy support or new event
+    return [{
+      id: Date.now().toString(),
+      name: event?.hostedBy || "",
+      instagram: event?.socialLinks?.instagram || "",
+      twitter: event?.socialLinks?.twitter || "",
+      linkedin: event?.socialLinks?.linkedin || ""
+    }];
+  });
+
+  // Derived state for legacy compatibility during submit
+  const hostedBy = hosts.map(h => h.name).filter(Boolean).join(", ");
+
+  const [startDate, setStartDate] = useState(event?.startDate ? new Date(event.startDate) : new Date());
+  const [endDate, setEndDate] = useState(event?.endDate ? new Date(event.endDate) : new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [requiresApproval, setRequiresApproval] = useState(event?.requiresApproval || false);
+  const [formFields, setFormFields] = useState<FormField[]>(event?.formFields || defaultFields);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
-  const createEventMutation = useMutation({
+  const submitMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/events", data);
-      return response.json();
+      if (event) {
+        const response = await apiRequest("PATCH", `/api/events/${event.id}`, data);
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/events", data);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
@@ -86,13 +161,25 @@ export default function CreateEventScreen({ navigation }: any) {
     },
   });
 
+  const addHost = useCallback(() => {
+    setHosts((prev) => [...prev, { id: Date.now().toString(), name: "", instagram: "", twitter: "", linkedin: "" }]);
+  }, []);
+
+  const updateHost = useCallback((id: string, updates: Partial<Host>) => {
+    setHosts((prev) => prev.map((h) => (h.id === id ? { ...h, ...updates } : h)));
+  }, []);
+
+  const removeHost = useCallback((id: string) => {
+    setHosts((prev) => (prev.length > 1 ? prev.filter((h) => h.id !== id) : prev));
+  }, []);
+
   const handleCreate = useCallback(() => {
     if (!title.trim()) {
       setError("Please enter an event title");
       return;
     }
 
-    createEventMutation.mutate({
+    submitMutation.mutate({
       title: title.trim(),
       description: description.trim(),
       location: location.trim(),
@@ -100,9 +187,57 @@ export default function CreateEventScreen({ navigation }: any) {
       endDate: endDate.toISOString(),
       requiresApproval,
       checkInEnabled: true,
+
       formFields,
+      coverImage: coverImage.trim(),
+      hostedBy: hostedBy.trim(),
+      socialLinks: hosts,
     });
-  }, [title, description, location, startDate, endDate, requiresApproval, formFields, createEventMutation]);
+  }, [title, description, location, startDate, endDate, requiresApproval, formFields, submitMutation, coverImage, hostedBy, hosts]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.2,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setUploading(true);
+      try {
+        const res = await apiRequest("POST", "/api/upload", {
+          image: `data:image/jpeg;base64,${result.assets[0].base64}`,
+        });
+        const data = await res.json();
+        setCoverImage(data.url);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (e: any) {
+        console.error("Upload failed", e);
+        setError("Failed to upload: " + (e.message || "Unknown error"));
+        Alert.alert("Upload Error", "Could not upload image. Please try a smaller image or check connection. Details: " + (e.message || "Unknown"));
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartPicker(false);
+    if (selectedDate) setStartDate(selectedDate);
+  };
+
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndPicker(false);
+    if (selectedDate) setEndDate(selectedDate);
+  };
+
+  const updateField = useCallback((id: string, updates: Partial<FormField>) => {
+    setFormFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, ...updates } : field))
+    );
+  }, []);
 
   const addField = useCallback(() => {
     const newField: FormField = {
@@ -130,7 +265,7 @@ export default function CreateEventScreen({ navigation }: any) {
   };
 
   const toggleApproval = useCallback(() => {
-    setRequiresApproval((prev) => !prev);
+    setRequiresApproval((prev: boolean) => !prev);
   }, []);
 
   return (
@@ -145,7 +280,7 @@ export default function CreateEventScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
       >
         <ThemedText type="h2" style={styles.title}>
-          Create Event
+          {event ? "Edit Event" : "Create Event"}
         </ThemedText>
 
         <View style={styles.section}>
@@ -167,19 +302,170 @@ export default function CreateEventScreen({ navigation }: any) {
             numberOfLines={4}
             style={styles.textArea}
           />
-          <Input
-            label="Location"
-            placeholder="Event location"
-            value={location}
-            onChangeText={setLocation}
-          />
+          <View style={{ zIndex: 10, marginBottom: 16 }}>
+            <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Location</ThemedText>
+            <GooglePlacesAutocomplete
+              placeholder="Search for event location"
+              onPress={(data: any, details = null) => {
+                setLocation(data.description);
+              }}
+              query={{
+                key: 'AIzaSyBH1Cl0wkbKTVR5Qmyv8_3UGZe-Er_nEDE',
+                language: 'en',
+              }}
+              styles={{
+                textInputContainer: {
+                  width: '100%',
+                  backgroundColor: 'transparent',
+                  borderTopWidth: 0,
+                  borderBottomWidth: 0,
+                  padding: 0,
+                  margin: 0,
+                },
+                textInput: {
+                  backgroundColor: theme.backgroundDefault,
+                  color: theme.text,
+                  height: 48,
+                  borderRadius: BorderRadius.md,
+                  paddingHorizontal: 16,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  fontSize: 16,
+                  marginTop: 0,
+                  marginLeft: 0,
+                  marginRight: 0,
+                },
+                description: {
+                  color: theme.text,
+                },
+                row: {
+                  backgroundColor: theme.backgroundDefault,
+                  padding: 13,
+                  height: 44,
+                  flexDirection: 'row',
+                },
+                listView: {
+                  backgroundColor: theme.backgroundDefault,
+                  borderRadius: BorderRadius.md,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  marginTop: 8,
+                },
+                separator: {
+                  height: 0.5,
+                  backgroundColor: theme.border,
+                },
+                poweredContainer: {
+                  backgroundColor: theme.backgroundDefault,
+                },
+              }}
+              textInputProps={{
+                placeholderTextColor: theme.textSecondary,
+                value: location,
+                onChangeText: setLocation,
+              }}
+              // @ts-ignore
+              listProps={{
+                nestedScrollEnabled: true,
+              }}
+              enablePoweredByContainer={false}
+              fetchDetails={false}
+              nearbyPlacesAPI='GooglePlacesSearch'
+              debounce={200}
+            />
+          </View>
+          <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Cover Image</ThemedText>
+          <Pressable
+            onPress={pickImage}
+            style={{
+              borderWidth: 1,
+              borderColor: theme.border,
+              borderStyle: 'dashed',
+              borderRadius: BorderRadius.md,
+              overflow: 'hidden',
+              marginBottom: Spacing.lg
+            }}
+          >
+            {coverImage ? (
+              <Image source={{ uri: coverImage }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
+            ) : (
+              <View style={{ alignItems: 'center', padding: Spacing["2xl"] }}>
+                {uploading ? (
+                  <ActivityIndicator color={theme.primary} />
+                ) : (
+                  <>
+                    <Icon name="image" size={32} color={theme.textSecondary} />
+                    <ThemedText style={{ color: theme.textSecondary, marginTop: 8 }}>
+                      Tap to upload cover image
+                    </ThemedText>
+                  </>
+                )}
+              </View>
+            )}
+          </Pressable>
+
+          <View style={{ marginTop: 16, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <ThemedText type="h4" style={{ fontSize: 16 }}>Hosts & Speakers</ThemedText>
+              <Pressable onPress={addHost} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.primary}15`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.sm }}>
+                <Icon name="plus" size={14} color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.primary, fontWeight: '600', marginLeft: 4 }}>Add Host</ThemedText>
+              </Pressable>
+            </View>
+
+            {hosts.map((host, index) => (
+              <View key={host.id} style={{ marginBottom: 16, padding: 12, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundDefault }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Host #{index + 1}</ThemedText>
+                  {hosts.length > 1 && (
+                    <Pressable onPress={() => removeHost(host.id)} hitSlop={10}>
+                      <Icon name="trash-2" size={16} color={theme.error} />
+                    </Pressable>
+                  )}
+                </View>
+                <Input
+                  label="Name"
+                  value={host.name}
+                  onChangeText={(t) => updateHost(host.id, { name: t })}
+                  placeholder="Host Name (e.g. John Doe)"
+                  style={{ marginBottom: 12 }}
+                />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Instagram"
+                      value={host.instagram}
+                      onChangeText={(t) => updateHost(host.id, { instagram: t })}
+                      placeholder="Link/Handle"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Twitter"
+                      value={host.twitter}
+                      onChangeText={(t) => updateHost(host.id, { twitter: t })}
+                      placeholder="Link/Handle"
+                    />
+                  </View>
+                </View>
+                <View style={{ marginTop: 12 }}>
+                  <Input
+                    label="LinkedIn"
+                    value={host.linkedin}
+                    onChangeText={(t) => updateHost(host.id, { linkedin: t })}
+                    placeholder="Link/Handle"
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={styles.section}>
           <ThemedText type="h4" style={styles.sectionTitle}>
             Date & Time
           </ThemedText>
-          <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <Pressable onPress={() => setShowStartPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
             <Icon name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
@@ -187,9 +473,19 @@ export default function CreateEventScreen({ navigation }: any) {
               </ThemedText>
               <ThemedText type="body">{formatDate(startDate)}</ThemedText>
             </View>
-          </View>
+          </Pressable>
+          {showStartPicker && (
+            <DateTimePicker
+              testID="dateTimePicker"
+              value={startDate}
+              mode="date"
+              is24Hour={true}
+              display="default"
+              onChange={onStartDateChange}
+            />
+          )}
 
-          <View style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <Pressable onPress={() => setShowEndPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
             <Icon name="calendar" size={18} color={theme.textSecondary} />
             <View style={styles.dateText}>
               <ThemedText type="small" style={styles.dateLabel}>
@@ -197,7 +493,17 @@ export default function CreateEventScreen({ navigation }: any) {
               </ThemedText>
               <ThemedText type="body">{formatDate(endDate)}</ThemedText>
             </View>
-          </View>
+          </Pressable>
+          {showEndPicker && (
+            <DateTimePicker
+              testID="dateTimePickerEnd"
+              value={endDate}
+              mode="date"
+              is24Hour={true}
+              display="default"
+              onChange={onEndDateChange}
+            />
+          )}
         </View>
 
         <View style={styles.section}>
@@ -247,6 +553,7 @@ export default function CreateEventScreen({ navigation }: any) {
               field={field}
               index={index}
               onRemove={removeField}
+              onUpdate={updateField}
               theme={theme}
             />
           ))}
@@ -260,13 +567,13 @@ export default function CreateEventScreen({ navigation }: any) {
 
         <Button
           onPress={handleCreate}
-          disabled={createEventMutation.isPending}
+          disabled={submitMutation.isPending}
           style={styles.createButton}
         >
-          {createEventMutation.isPending ? (
+          {submitMutation.isPending ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            "Create Event"
+            event ? "Update Event" : "Create Event"
           )}
         </Button>
       </ScrollView>

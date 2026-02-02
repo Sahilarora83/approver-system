@@ -1,32 +1,29 @@
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
-import { db } from "./db";
-import {
-  users,
-  events,
-  registrations,
-  checkIns,
-  formTemplates,
-  type User,
-  type Event,
-  type Registration,
-  type CheckIn,
-  type FormTemplate,
-  type InsertUser,
-} from "@shared/schema";
+import { supabase, toCamelCase, toSnakeCase } from "./supabase";
+import type { User, Event, Registration, CheckIn, InsertUser, Notification } from "@shared/schema";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+
+  followUser(followerId: string, followingId: string): Promise<void>;
+  unfollowUser(followerId: string, followingId: string): Promise<void>;
+  isFollowing(followerId: string, followingId: string): Promise<boolean>;
 
   getEvents(organizerId: string): Promise<(Event & { registrationCount: number })[]>;
+  getAllEvents(limit?: number, offset?: number): Promise<(Event & { registrationCount: number })[]>;
   getEvent(id: string): Promise<Event | undefined>;
   getEventByPublicLink(link: string): Promise<Event | undefined>;
   createEvent(event: Omit<Event, "id" | "createdAt" | "publicLink">): Promise<Event>;
   updateEvent(id: string, data: Partial<Event>): Promise<Event | undefined>;
+  deleteEvent(id: string): Promise<boolean>;
+  getRegistrationForUserEvent(userId: string, eventId: string): Promise<Registration | undefined>;
+  getRegistrationByEmailForEvent(email: string, eventId: string): Promise<Registration | undefined>;
 
-  getRegistrations(eventId: string): Promise<Registration[]>;
+  getRegistrations(eventId: string, limit?: number, offset?: number): Promise<Registration[]>;
   getRegistration(id: string): Promise<(Registration & { event: Event }) | undefined>;
   getRegistrationByQR(qrCode: string): Promise<(Registration & { event: Event }) | undefined>;
   getUserRegistrations(userId: string): Promise<(Registration & { event: Event })[]>;
@@ -43,164 +40,473 @@ export interface IStorage {
     totalCheckedIn: number;
     totalPending: number;
   }>;
+
+  getUserStats(userId: string): Promise<{
+    createdEvents: number;
+    participatedEvents: number;
+    tickets: number;
+    following: number;
+    unreadNotifications: number;
+  }>;
+  getNotifications(userId: string): Promise<Notification[]>;
+  createNotification(data: Omit<Notification, "id" | "createdAt">): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<void>;
+  getFollowers(userId: string): Promise<string[]>;
+  createBroadcast(data: { eventId: string; organizerId: string; title?: string; message: string }): Promise<void>;
+  linkRegistrationsToUser(email: string, userId: string): Promise<void>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class SupabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return user;
+    const { data, error } = await supabase
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) return undefined;
+    return toCamelCase(data) as User;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return user;
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) return undefined;
+    return toCamelCase(data) as User;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        email: insertUser.email,
+        password: insertUser.password,
+        name: insertUser.name,
+        role: insertUser.role || 'participant',
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return toCamelCase(data) as User;
+  }
+
+  async updateUser(id: string, updateData: Partial<User>): Promise<User | undefined> {
+    const { data, error } = await supabase
+      .from('users')
+      .update(toSnakeCase(updateData))
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return undefined;
+    return toCamelCase(data) as User;
+  }
+
+  async followUser(followerId: string, followingId: string): Promise<void> {
+    const { error } = await supabase
+      .from('follows')
+      .insert({
+        follower_id: followerId,
+        following_id: followingId,
+      });
+
+    if (error) throw new Error(error.message);
+  }
+
+  async unfollowUser(followerId: string, followingId: string): Promise<void> {
+    const { error } = await supabase
+      .from('follows')
+      .delete()
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId);
+
+    if (error) throw new Error(error.message);
+  }
+
+  async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('*')
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId)
+      .maybeSingle();
+
+    if (error) return false;
+    return !!data;
   }
 
   async getEvents(organizerId: string): Promise<(Event & { registrationCount: number })[]> {
-    const result = await db
-      .select({
-        event: events,
-        registrationCount: sql<number>`cast(count(${registrations.id}) as int)`,
-      })
-      .from(events)
-      .leftJoin(registrations, eq(events.id, registrations.eventId))
-      .where(eq(events.organizerId, organizerId))
-      .groupBy(events.id)
-      .orderBy(desc(events.createdAt));
+    const { data: events, error } = await supabase
+      .from('events')
+      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .eq('organizer_id', organizerId)
+      .order('created_at', { ascending: false });
 
-    return result.map((r) => ({
-      ...r.event,
-      registrationCount: r.registrationCount || 0,
-    }));
+    if (error) throw new Error(error.message);
+
+    const eventsWithCounts = await Promise.all(
+      (events || []).map(async (event) => {
+        const { count } = await supabase
+          .from('registrations')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_id', event.id);
+
+        const transformed = toCamelCase(event);
+        if (event.users) {
+          transformed.organizerProfileImage = event.users.profile_image;
+        }
+
+        return {
+          ...transformed,
+          registrationCount: count || 0,
+        } as Event & { registrationCount: number };
+      })
+    );
+
+    return eventsWithCounts;
+  }
+
+  async getAllEvents(limit: number = 20, offset: number = 0): Promise<(Event & { registrationCount: number })[]> {
+    const { data: events, error } = await supabase
+      .from('events')
+      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new Error(error.message);
+
+    const eventsWithCounts = await Promise.all(
+      (events || []).map(async (event) => {
+        const { count } = await supabase
+          .from('registrations')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_id', event.id);
+
+        const transformed = toCamelCase(event);
+        if (event.users) {
+          transformed.organizerProfileImage = event.users.profile_image;
+        }
+        return {
+          ...transformed,
+          registrationCount: count || 0,
+        } as Event & { registrationCount: number };
+      })
+    );
+
+    return eventsWithCounts;
   }
 
   async getEvent(id: string): Promise<Event | undefined> {
-    const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
-    return event;
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .eq('id', id)
+      .single();
+
+    if (error) return undefined;
+    const transformed = toCamelCase(data);
+    if (data.users) {
+      transformed.organizerProfileImage = data.users.profile_image;
+    }
+    return transformed as Event;
   }
 
   async getEventByPublicLink(link: string): Promise<Event | undefined> {
-    const [event] = await db.select().from(events).where(eq(events.publicLink, link)).limit(1);
-    return event;
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .eq('public_link', link)
+      .single();
+
+    if (error) return undefined;
+    const transformed = toCamelCase(data);
+    if (data.users) {
+      transformed.organizerProfileImage = data.users.profile_image;
+    }
+    return transformed as Event;
   }
 
-  async createEvent(data: Omit<Event, "id" | "createdAt" | "publicLink">): Promise<Event> {
+  async createEvent(eventData: Omit<Event, "id" | "createdAt" | "publicLink">): Promise<Event> {
     const publicLink = randomUUID().slice(0, 8);
-    const [event] = await db
-      .insert(events)
-      .values({ ...data, publicLink })
-      .returning();
-    return event;
-  }
-
-  async updateEvent(id: string, data: Partial<Event>): Promise<Event | undefined> {
-    const [event] = await db.update(events).set(data).where(eq(events.id, id)).returning();
-    return event;
-  }
-
-  async getRegistrations(eventId: string): Promise<Registration[]> {
-    return db
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        organizer_id: eventData.organizerId,
+        title: eventData.title,
+        description: eventData.description,
+        location: eventData.location,
+        start_date: eventData.startDate,
+        end_date: eventData.endDate,
+        requires_approval: eventData.requiresApproval,
+        check_in_enabled: eventData.checkInEnabled,
+        form_fields: eventData.formFields,
+        public_link: publicLink,
+        cover_image: eventData.coverImage,
+        hosted_by: eventData.hostedBy,
+        social_links: eventData.socialLinks || {},
+      })
       .select()
-      .from(registrations)
-      .where(eq(registrations.eventId, eventId))
-      .orderBy(desc(registrations.createdAt));
+      .single();
+
+    if (error) throw new Error(error.message);
+    return toCamelCase(data) as Event;
+  }
+
+  async updateEvent(id: string, updateData: Partial<Event>): Promise<Event | undefined> {
+    const { data, error } = await supabase
+      .from('events')
+      .update(toSnakeCase(updateData))
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return undefined;
+    return toCamelCase(data) as Event;
+  }
+
+  async getRegistrationForUserEvent(userId: string, eventId: string): Promise<Registration | undefined> {
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (error) return undefined;
+    return toCamelCase(data) as Registration;
+  }
+
+  async getRegistrationByEmailForEvent(email: string, eventId: string): Promise<Registration | undefined> {
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('email', email)
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (error) return undefined;
+    return toCamelCase(data) as Registration;
+  }
+
+  async deleteEvent(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
+
+    return !error;
+  }
+
+  async getRegistrations(eventId: string, limit: number = 50, offset: number = 0): Promise<Registration[]> {
+    const { data, error } = await supabase
+      .from('registrations')
+      .select(`
+        *,
+        users!registrations_user_id_fkey (
+          profile_image
+        )
+      `)
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new Error(error.message);
+
+    return (data || []).map((item: any) => {
+      const registration = toCamelCase(item) as any;
+      // Add profile image from joined user data
+      if (item.users) {
+        registration.profileImage = item.users.profile_image;
+      }
+      // Remove the users object as we've extracted what we need
+      delete registration.users;
+      return registration;
+    }) as Registration[];
   }
 
   async getRegistration(id: string): Promise<(Registration & { event: Event }) | undefined> {
-    const [result] = await db
-      .select({
-        registration: registrations,
-        event: events,
-      })
-      .from(registrations)
-      .innerJoin(events, eq(registrations.eventId, events.id))
-      .where(eq(registrations.id, id))
-      .limit(1);
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*, events(*)')
+      .eq('id', id)
+      .single();
 
-    if (!result) return undefined;
-    return { ...result.registration, event: result.event };
+    if (error) return undefined;
+
+    const { events, ...registration } = data;
+    return {
+      ...toCamelCase(registration),
+      event: toCamelCase(events)
+    } as Registration & { event: Event };
   }
 
   async getRegistrationByQR(qrCode: string): Promise<(Registration & { event: Event }) | undefined> {
-    const [result] = await db
-      .select({
-        registration: registrations,
-        event: events,
-      })
-      .from(registrations)
-      .innerJoin(events, eq(registrations.eventId, events.id))
-      .where(eq(registrations.qrCode, qrCode))
-      .limit(1);
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*, events(*)')
+      .eq('qr_code', qrCode)
+      .single();
 
-    if (!result) return undefined;
-    return { ...result.registration, event: result.event };
+    if (error) return undefined;
+
+    const { events, ...registration } = data;
+    return {
+      ...toCamelCase(registration),
+      event: toCamelCase(events)
+    } as Registration & { event: Event };
   }
 
   async getUserRegistrations(userId: string): Promise<(Registration & { event: Event })[]> {
-    const result = await db
-      .select({
-        registration: registrations,
-        event: events,
-      })
-      .from(registrations)
-      .innerJoin(events, eq(registrations.eventId, events.id))
-      .where(eq(registrations.userId, userId))
-      .orderBy(desc(registrations.createdAt));
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*, events(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    return result.map((r) => ({ ...r.registration, event: r.event }));
+    if (error) throw new Error(error.message);
+
+    return (data || []).map(({ events, ...registration }) => ({
+      ...toCamelCase(registration),
+      event: toCamelCase(events),
+    })) as (Registration & { event: Event })[];
   }
 
   async getUserRegistrationsByEmail(email: string): Promise<(Registration & { event: Event })[]> {
-    const result = await db
-      .select({
-        registration: registrations,
-        event: events,
-      })
-      .from(registrations)
-      .innerJoin(events, eq(registrations.eventId, events.id))
-      .where(eq(registrations.email, email))
-      .orderBy(desc(registrations.createdAt));
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*, events(*)')
+      .eq('email', email)
+      .order('created_at', { ascending: false });
 
-    return result.map((r) => ({ ...r.registration, event: r.event }));
+    if (error) throw new Error(error.message);
+
+    return (data || []).map(({ events, ...registration }) => ({
+      ...toCamelCase(registration),
+      event: toCamelCase(events),
+    })) as (Registration & { event: Event })[];
   }
 
   async createRegistration(
-    data: Omit<Registration, "id" | "createdAt" | "qrCode" | "ticketLink">
+    regData: Omit<Registration, "id" | "createdAt" | "qrCode" | "ticketLink">
   ): Promise<Registration> {
     const qrCode = `QR-${randomUUID()}`;
     const ticketLink = `ticket-${randomUUID().slice(0, 12)}`;
-    const [registration] = await db
-      .insert(registrations)
-      .values({ ...data, qrCode, ticketLink })
-      .returning();
-    return registration;
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .insert({
+        event_id: regData.eventId,
+        user_id: regData.userId,
+        name: regData.name,
+        email: regData.email,
+        phone: regData.phone,
+        form_data: regData.formData,
+        status: regData.status,
+        qr_code: qrCode,
+        ticket_link: ticketLink,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return toCamelCase(data) as Registration;
   }
 
   async updateRegistrationStatus(id: string, status: string): Promise<Registration | undefined> {
-    const [registration] = await db
-      .update(registrations)
-      .set({ status })
-      .where(eq(registrations.id, id))
-      .returning();
-    return registration;
+    const { data, error } = await supabase
+      .from('registrations')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return undefined;
+    return toCamelCase(data) as Registration;
   }
 
-  async createCheckIn(data: Omit<CheckIn, "id" | "timestamp">): Promise<CheckIn> {
-    const [checkIn] = await db.insert(checkIns).values(data).returning();
-    return checkIn;
+  async createCheckIn(checkInData: Omit<CheckIn, "id" | "timestamp">): Promise<CheckIn> {
+    const { data, error } = await supabase
+      .from('check_ins')
+      .insert({
+        registration_id: checkInData.registrationId,
+        verifier_id: checkInData.verifierId,
+        type: checkInData.type,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data as CheckIn;
   }
 
   async getCheckIns(registrationId: string): Promise<CheckIn[]> {
-    return db
-      .select()
-      .from(checkIns)
-      .where(eq(checkIns.registrationId, registrationId))
-      .orderBy(desc(checkIns.timestamp));
+    const { data, error } = await supabase
+      .from('check_ins')
+      .select('*')
+      .eq('registration_id', registrationId)
+      .order('timestamp', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data as CheckIn[];
   }
 
   async getAdminStats(organizerId: string): Promise<{
@@ -209,17 +515,17 @@ export class DatabaseStorage implements IStorage {
     totalCheckedIn: number;
     totalPending: number;
   }> {
-    const [eventsCount] = await db
-      .select({ count: sql<number>`cast(count(*) as int)` })
-      .from(events)
-      .where(eq(events.organizerId, organizerId));
+    const { count: totalEvents } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('organizer_id', organizerId);
 
-    const organizerEvents = await db
-      .select({ id: events.id })
-      .from(events)
-      .where(eq(events.organizerId, organizerId));
+    const { data: events } = await supabase
+      .from('events')
+      .select('id')
+      .eq('organizer_id', organizerId);
 
-    const eventIds = organizerEvents.map((e) => e.id);
+    const eventIds = (events || []).map(e => e.id);
 
     if (eventIds.length === 0) {
       return {
@@ -230,22 +536,136 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
-    const [regsStats] = await db
-      .select({
-        total: sql<number>`cast(count(*) as int)`,
-        checkedIn: sql<number>`cast(count(case when ${registrations.status} = 'checked_in' then 1 end) as int)`,
-        pending: sql<number>`cast(count(case when ${registrations.status} = 'pending' then 1 end) as int)`,
-      })
-      .from(registrations)
-      .where(inArray(registrations.eventId, eventIds));
+    const { count: totalRegistrations } = await supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .in('event_id', eventIds);
+
+    const { count: totalCheckedIn } = await supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .in('event_id', eventIds)
+      .eq('status', 'checked_in');
+
+    const { count: totalPending } = await supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .in('event_id', eventIds)
+      .eq('status', 'pending');
 
     return {
-      totalEvents: eventsCount?.count || 0,
-      totalRegistrations: regsStats?.total || 0,
-      totalCheckedIn: regsStats?.checkedIn || 0,
-      totalPending: regsStats?.pending || 0,
+      totalEvents: totalEvents || 0,
+      totalRegistrations: totalRegistrations || 0,
+      totalCheckedIn: totalCheckedIn || 0,
+      totalPending: totalPending || 0,
     };
+  }
+
+  async getUserStats(userId: string): Promise<{
+    createdEvents: number;
+    participatedEvents: number;
+    tickets: number;
+    following: number;
+    unreadNotifications: number;
+  }> {
+    const { count: createdEvents } = await supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('organizer_id', userId);
+
+    const { count: tickets } = await supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const { count: following } = await supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', userId);
+
+    const { count: unreadNotifications } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('read', false);
+
+    return {
+      createdEvents: createdEvents || 0,
+      participatedEvents: tickets || 0,
+      tickets: tickets || 0,
+      following: following || 0,
+      unreadNotifications: unreadNotifications || 0,
+    };
+  }
+
+  async getNotifications(userId: string): Promise<Notification[]> {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return (data || []).map(toCamelCase) as Notification[];
+  }
+
+  async createNotification(data: Omit<Notification, "id" | "createdAt">): Promise<Notification> {
+    const { data: notification, error } = await supabase
+      .from('notifications')
+      .insert(toSnakeCase(data))
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return toCamelCase(notification) as Notification;
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id);
+
+    if (error) throw new Error(error.message);
+  }
+
+  async getFollowers(userId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', userId);
+
+    if (error) throw new Error(error.message);
+    return (data || []).map(f => f.follower_id);
+  }
+
+  async createBroadcast(data: { eventId: string; organizerId: string; title?: string; message: string }): Promise<void> {
+    console.log(`[Storage] Creating broadcast for event ${data.eventId} by ${data.organizerId}`);
+    const { error } = await supabase
+      .from('broadcasts')
+      .insert(toSnakeCase(data));
+
+    if (error) {
+      console.error(`[Storage Error] Broadcast Insert failed: ${error.message}`);
+      throw new Error(error.message);
+    }
+    console.log(`[Storage] Broadcast stored successfully`);
+  }
+
+  async linkRegistrationsToUser(email: string, userId: string): Promise<void> {
+    console.log(`[Storage] Linking guest registrations for ${email} to user ${userId}`);
+    const { error } = await supabase
+      .from('registrations')
+      .update({ user_id: userId })
+      .eq('email', email.toLowerCase().trim())
+      .is('user_id', null);
+
+    if (error) {
+      console.error(`[Storage Error] Failed to link registrations: ${error.message}`);
+    } else {
+      console.log(`[Storage] Successfully linked registrations for ${email}`);
+    }
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new SupabaseStorage();

@@ -78,6 +78,17 @@ export default function ScannerScreen() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ regId, status }: { regId: string; status: string }) => {
+      return apiRequest("PATCH", `/api/registrations/${regId}/status`, { status });
+    },
+    onSuccess: () => {
+      // Status updated, now we can check in if needed. 
+      // But handleApproveAndCheckIn will handle the flow.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+  });
+
   const checkInMutation = useMutation({
     mutationFn: async ({ registrationId, type }: { registrationId: string; type: string }) => {
       const response = await apiRequest("POST", "/api/check-in", { registrationId, type });
@@ -124,6 +135,24 @@ export default function ScannerScreen() {
       });
     }
   }, [result, checkInMutation]);
+
+  const handleApproveAndCheckIn = useCallback(async () => {
+    if (result?.registration) {
+      try {
+        await updateStatusMutation.mutateAsync({
+          regId: result.registration.id,
+          status: 'approved'
+        });
+        // Short delay to allow DB propagation if needed, though await should suffice
+        checkInMutation.mutate({
+          registrationId: result.registration.id,
+          type: "check_in",
+        });
+      } catch (e) {
+        setError("Failed to approve user");
+      }
+    }
+  }, [result, updateStatusMutation, checkInMutation]);
 
   if (!permission) {
     return (
@@ -249,7 +278,11 @@ export default function ScannerScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            {result.registration.status !== "checked_in" ? (
+            {result.registration.status === "pending" ? (
+              <Button onPress={handleApproveAndCheckIn} style={[styles.actionButton, { backgroundColor: theme.primary }]}>
+                Approve & Check In
+              </Button>
+            ) : result.registration.status !== "checked_in" ? (
               <Button onPress={handleCheckIn} style={[styles.actionButton, { backgroundColor: theme.success }]}>
                 Check In
               </Button>

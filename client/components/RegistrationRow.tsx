@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View, Pressable } from "react-native";
+import { StyleSheet, View, Pressable, Image } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
@@ -12,6 +13,7 @@ interface RegistrationRowProps {
   email: string;
   date: string;
   status: "pending" | "approved" | "rejected" | "checked_in" | "checked_out";
+  profileImage?: string;
   onApprove?: () => void;
   onReject?: () => void;
   onPress?: () => void;
@@ -22,6 +24,7 @@ export function RegistrationRow({
   email,
   date,
   status,
+  profileImage,
   onApprove,
   onReject,
   onPress,
@@ -46,6 +49,22 @@ export function RegistrationRow({
         { backgroundColor: pressed ? theme.backgroundSecondary : theme.backgroundDefault },
       ]}
     >
+      {/* Profile Avatar */}
+      <View style={[styles.avatarContainer, { borderColor: theme.primary }]}>
+        {profileImage ? (
+          <Image source={{ uri: profileImage }} style={styles.avatar} />
+        ) : (
+          <LinearGradient
+            colors={[theme.primary, '#4c669f']}
+            style={styles.avatar}
+          >
+            <ThemedText style={styles.avatarText}>
+              {name?.charAt(0).toUpperCase() || "?"}
+            </ThemedText>
+          </LinearGradient>
+        )}
+      </View>
+
       <View style={styles.info}>
         <ThemedText type="body" style={styles.name}>
           {name}
@@ -92,6 +111,26 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.sm,
     marginBottom: Spacing.sm,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    padding: 2,
+    marginRight: Spacing.md,
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   info: {
     flex: 1,

@@ -3,6 +3,7 @@ import { Platform, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { TabIcon } from "@/components/TabIcon";
@@ -41,6 +42,7 @@ function ProfileStack() {
 
 export default function VerifierTabNavigator() {
   const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const renderScanIcon = useCallback(
     ({ color, size }: { color: string; size: number }) => (
@@ -80,11 +82,13 @@ export default function VerifierTabNavigator() {
         }),
         borderTopWidth: 0,
         elevation: 0,
+        height: 60 + insets.bottom,
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
       },
       tabBarBackground,
       headerShown: false,
     }),
-    [theme, tabBarBackground]
+    [theme, tabBarBackground, insets.bottom]
   );
 
   return (

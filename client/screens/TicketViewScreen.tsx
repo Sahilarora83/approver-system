@@ -18,7 +18,7 @@ export default function TicketViewScreen({ route }: any) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
-  const { data: ticket, isLoading } = useQuery({
+  const { data: ticket, isLoading } = useQuery<any>({
     queryKey: ["/api/registrations", registrationId],
   });
 
@@ -80,14 +80,26 @@ export default function TicketViewScreen({ route }: any) {
             <StatusBadge status={ticket.status} size="medium" />
           </View>
 
-          <View style={[styles.qrContainer, { backgroundColor: "#FFFFFF" }]}>
-            <QRCode
-              value={ticket.qrCode}
-              size={200}
-              backgroundColor="#FFFFFF"
-              color="#000000"
-            />
-          </View>
+          {ticket.status === 'approved' || ticket.status === 'checked_in' || ticket.status === 'checked_out' ? (
+            <View style={[styles.qrContainer, { backgroundColor: "#FFFFFF" }]}>
+              <QRCode
+                value={ticket.qrCode}
+                size={200}
+                backgroundColor="#FFFFFF"
+                color="#000000"
+              />
+            </View>
+          ) : (
+            <View style={[styles.qrContainer, { backgroundColor: 'rgba(255, 165, 0, 0.05)', padding: 40, alignItems: 'center' }]}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 165, 0, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <Feather name="clock" size={32} color="#FFA500" />
+              </View>
+              <ThemedText style={{ color: '#FFA500', fontWeight: '700', textAlign: 'center' }}>Approval Pending</ThemedText>
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8 }}>
+                Your QR code will be generated once the host approves your registration.
+              </ThemedText>
+            </View>
+          )}
 
           <View style={[styles.divider, { borderColor: theme.backgroundSecondary }]} />
 
