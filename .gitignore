@@ -41,3 +41,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# local data
+.sessions/
+uploads/
+.env
+.session-file-store/
