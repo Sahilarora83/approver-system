@@ -33,11 +33,14 @@ export function resolveImageUrl(path: string | null | undefined): string {
   if (path.startsWith("http") || path.startsWith("file://") || path.startsWith("data:") || path.startsWith("content://")) {
     if (path.startsWith("http")) {
       const baseUrl = getApiUrl();
-      // Get the current hostname (e.g. "192.168.1.111:5000")
+      // Get the current hostname (e.g. "approver-system.onrender.com")
       const currentHost = baseUrl.split("://")[1];
+      const protocol = baseUrl.split("://")[0];
 
-      // Replace localhost, 127.0.0.1, or any 192.168.x.x IP (with optional port) with the current host
-      return path.replace(/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/g, currentHost);
+      // If it contains a local IP or localhost, replace both the host and protocol
+      if (/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/.test(path)) {
+        return path.replace(/https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/g, `${protocol}://${currentHost}`);
+      }
     }
     return path;
   }

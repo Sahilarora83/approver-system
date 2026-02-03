@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo, useEffect } from "react";
-import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform, Switch, Image, Alert, LogBox } from "react-native";
+import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, Platform, Switch, Image, Alert, LogBox, KeyboardAvoidingView } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
@@ -282,313 +282,318 @@ export default function CreateEventScreen({ navigation, route }: any) {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: headerHeight + Spacing.xl,
-          paddingBottom: insets.bottom + Spacing["2xl"],
-          paddingHorizontal: Spacing.lg,
-        }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        <ThemedText type="h2" style={styles.title}>
-          {event ? "Edit Event" : "Create Event"}
-        </ThemedText>
-
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>
-            Event Details
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: headerHeight + Spacing.xl,
+            paddingBottom: insets.bottom + Spacing["2xl"],
+            paddingHorizontal: Spacing.lg,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <ThemedText type="h2" style={styles.title}>
+            {event ? "Edit Event" : "Create Event"}
           </ThemedText>
-          <Input
-            label="Event Title"
-            placeholder="Enter event title"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <Input
-            label="Description"
-            placeholder="Describe your event"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            style={styles.textArea}
-          />
-          <View style={{ zIndex: 10, marginBottom: 16 }}>
-            <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Location</ThemedText>
-            <GooglePlacesAutocomplete
-              placeholder="Search for event location"
-              onPress={(data: any, details = null) => {
-                setLocation(data.description);
-              }}
-              query={{
-                key: 'AIzaSyBH1Cl0wkbKTVR5Qmyv8_3UGZe-Er_nEDE',
-                language: 'en',
-              }}
-              styles={{
-                textInputContainer: {
-                  width: '100%',
-                  backgroundColor: 'transparent',
-                  borderTopWidth: 0,
-                  borderBottomWidth: 0,
-                  padding: 0,
-                  margin: 0,
-                },
-                textInput: {
-                  backgroundColor: theme.backgroundDefault,
-                  color: theme.text,
-                  height: 48,
-                  borderRadius: BorderRadius.md,
-                  paddingHorizontal: 16,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  fontSize: 16,
-                  marginTop: 0,
-                  marginLeft: 0,
-                  marginRight: 0,
-                },
-                description: {
-                  color: theme.text,
-                },
-                row: {
-                  backgroundColor: theme.backgroundDefault,
-                  padding: 13,
-                  height: 44,
-                  flexDirection: 'row',
-                },
-                listView: {
-                  backgroundColor: theme.backgroundDefault,
-                  borderRadius: BorderRadius.md,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  marginTop: 8,
-                },
-                separator: {
-                  height: 0.5,
-                  backgroundColor: theme.border,
-                },
-                poweredContainer: {
-                  backgroundColor: theme.backgroundDefault,
-                },
-              }}
-              textInputProps={{
-                placeholderTextColor: theme.textSecondary,
-                value: location,
-                onChangeText: setLocation,
-              }}
-              // @ts-ignore
-              listProps={{
-                nestedScrollEnabled: true,
-              }}
-              enablePoweredByContainer={false}
-              fetchDetails={false}
-              nearbyPlacesAPI='GooglePlacesSearch'
-              debounce={200}
+
+          <View style={styles.section}>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Event Details
+            </ThemedText>
+            <Input
+              label="Event Title"
+              placeholder="Enter event title"
+              value={title}
+              onChangeText={setTitle}
             />
-          </View>
-          <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Cover Image</ThemedText>
-          <Pressable
-            onPress={pickImage}
-            style={{
-              borderWidth: 1,
-              borderColor: theme.border,
-              borderStyle: 'dashed',
-              borderRadius: BorderRadius.md,
-              overflow: 'hidden',
-              marginBottom: Spacing.lg
-            }}
-          >
-            {coverImage ? (
-              <Image source={{ uri: coverImage }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
-            ) : (
-              <View style={{ alignItems: 'center', padding: Spacing["2xl"] }}>
-                {uploading ? (
-                  <ActivityIndicator color={theme.primary} />
-                ) : (
-                  <>
-                    <Icon name="image" size={32} color={theme.textSecondary} />
-                    <ThemedText style={{ color: theme.textSecondary, marginTop: 8 }}>
-                      Tap to upload cover image
-                    </ThemedText>
-                  </>
-                )}
-              </View>
-            )}
-          </Pressable>
-
-          <View style={{ marginTop: 16, marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <ThemedText type="h4" style={{ fontSize: 16 }}>Hosts & Speakers</ThemedText>
-              <Pressable onPress={addHost} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.primary}15`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.sm }}>
-                <Icon name="plus" size={14} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, fontWeight: '600', marginLeft: 4 }}>Add Host</ThemedText>
-              </Pressable>
+            <Input
+              label="Description"
+              placeholder="Describe your event"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              style={styles.textArea}
+            />
+            <View style={{ zIndex: 10, marginBottom: 16 }}>
+              <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Location</ThemedText>
+              <GooglePlacesAutocomplete
+                placeholder="Search for event location"
+                onPress={(data: any, details = null) => {
+                  setLocation(data.description);
+                }}
+                query={{
+                  key: 'AIzaSyBH1Cl0wkbKTVR5Qmyv8_3UGZe-Er_nEDE',
+                  language: 'en',
+                }}
+                styles={{
+                  textInputContainer: {
+                    width: '100%',
+                    backgroundColor: 'transparent',
+                    borderTopWidth: 0,
+                    borderBottomWidth: 0,
+                    padding: 0,
+                    margin: 0,
+                  },
+                  textInput: {
+                    backgroundColor: theme.backgroundDefault,
+                    color: theme.text,
+                    height: 48,
+                    borderRadius: BorderRadius.md,
+                    paddingHorizontal: 16,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    fontSize: 16,
+                    marginTop: 0,
+                    marginLeft: 0,
+                    marginRight: 0,
+                  },
+                  description: {
+                    color: theme.text,
+                  },
+                  row: {
+                    backgroundColor: theme.backgroundDefault,
+                    padding: 13,
+                    height: 44,
+                    flexDirection: 'row',
+                  },
+                  listView: {
+                    backgroundColor: theme.backgroundDefault,
+                    borderRadius: BorderRadius.md,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    marginTop: 8,
+                  },
+                  separator: {
+                    height: 0.5,
+                    backgroundColor: theme.border,
+                  },
+                  poweredContainer: {
+                    backgroundColor: theme.backgroundDefault,
+                  },
+                }}
+                textInputProps={{
+                  placeholderTextColor: theme.textSecondary,
+                  value: location,
+                  onChangeText: setLocation,
+                }}
+                // @ts-ignore
+                listProps={{
+                  nestedScrollEnabled: true,
+                }}
+                enablePoweredByContainer={false}
+                fetchDetails={false}
+                nearbyPlacesAPI='GooglePlacesSearch'
+                debounce={200}
+              />
             </View>
-
-            {hosts.map((host, index) => (
-              <View key={host.id} style={{ marginBottom: 16, padding: 12, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundDefault }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Host #{index + 1}</ThemedText>
-                  {hosts.length > 1 && (
-                    <Pressable onPress={() => removeHost(host.id)} hitSlop={10}>
-                      <Icon name="trash-2" size={16} color={theme.error} />
-                    </Pressable>
+            <ThemedText type="body" style={{ marginBottom: 8, fontWeight: '500' }}>Cover Image</ThemedText>
+            <Pressable
+              onPress={pickImage}
+              style={{
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderStyle: 'dashed',
+                borderRadius: BorderRadius.md,
+                overflow: 'hidden',
+                marginBottom: Spacing.lg
+              }}
+            >
+              {coverImage ? (
+                <Image source={{ uri: coverImage }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
+              ) : (
+                <View style={{ alignItems: 'center', padding: Spacing["2xl"] }}>
+                  {uploading ? (
+                    <ActivityIndicator color={theme.primary} />
+                  ) : (
+                    <>
+                      <Icon name="image" size={32} color={theme.textSecondary} />
+                      <ThemedText style={{ color: theme.textSecondary, marginTop: 8 }}>
+                        Tap to upload cover image
+                      </ThemedText>
+                    </>
                   )}
                 </View>
-                <Input
-                  label="Name"
-                  value={host.name}
-                  onChangeText={(t) => updateHost(host.id, { name: t })}
-                  placeholder="Host Name (e.g. John Doe)"
-                  style={{ marginBottom: 12 }}
-                />
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Input
-                      label="Instagram"
-                      value={host.instagram}
-                      onChangeText={(t) => updateHost(host.id, { instagram: t })}
-                      placeholder="Link/Handle"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Input
-                      label="Twitter"
-                      value={host.twitter}
-                      onChangeText={(t) => updateHost(host.id, { twitter: t })}
-                      placeholder="Link/Handle"
-                    />
-                  </View>
-                </View>
-                <View style={{ marginTop: 12 }}>
-                  <Input
-                    label="LinkedIn"
-                    value={host.linkedin}
-                    onChangeText={(t) => updateHost(host.id, { linkedin: t })}
-                    placeholder="Link/Handle"
-                  />
-                </View>
+              )}
+            </Pressable>
+
+            <View style={{ marginTop: 16, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <ThemedText type="h4" style={{ fontSize: 16 }}>Hosts & Speakers</ThemedText>
+                <Pressable onPress={addHost} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.primary}15`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.sm }}>
+                  <Icon name="plus" size={14} color={theme.primary} />
+                  <ThemedText type="small" style={{ color: theme.primary, fontWeight: '600', marginLeft: 4 }}>Add Host</ThemedText>
+                </Pressable>
               </View>
-            ))}
+
+              {hosts.map((host, index) => (
+                <View key={host.id} style={{ marginBottom: 16, padding: 12, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundDefault }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>Host #{index + 1}</ThemedText>
+                    {hosts.length > 1 && (
+                      <Pressable onPress={() => removeHost(host.id)} hitSlop={10}>
+                        <Icon name="trash-2" size={16} color={theme.error} />
+                      </Pressable>
+                    )}
+                  </View>
+                  <Input
+                    label="Name"
+                    value={host.name}
+                    onChangeText={(t) => updateHost(host.id, { name: t })}
+                    placeholder="Host Name (e.g. John Doe)"
+                    style={{ marginBottom: 12 }}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Input
+                        label="Instagram"
+                        value={host.instagram}
+                        onChangeText={(t) => updateHost(host.id, { instagram: t })}
+                        placeholder="Link/Handle"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Input
+                        label="Twitter"
+                        value={host.twitter}
+                        onChangeText={(t) => updateHost(host.id, { twitter: t })}
+                        placeholder="Link/Handle"
+                      />
+                    </View>
+                  </View>
+                  <View style={{ marginTop: 12 }}>
+                    <Input
+                      label="LinkedIn"
+                      value={host.linkedin}
+                      onChangeText={(t) => updateHost(host.id, { linkedin: t })}
+                      placeholder="Link/Handle"
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>
-            Date & Time
-          </ThemedText>
-          <Pressable onPress={() => setShowStartPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <Icon name="calendar" size={18} color={theme.textSecondary} />
-            <View style={styles.dateText}>
-              <ThemedText type="small" style={styles.dateLabel}>
-                Start Date
-              </ThemedText>
-              <ThemedText type="body">{formatDate(startDate)}</ThemedText>
-            </View>
-          </Pressable>
-          {showStartPicker && (
-            <DateTimePicker
-              testID="dateTimePicker"
-              value={startDate}
-              mode="date"
-              is24Hour={true}
-              display="default"
-              onChange={onStartDateChange}
-            />
-          )}
-
-          <Pressable onPress={() => setShowEndPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-            <Icon name="calendar" size={18} color={theme.textSecondary} />
-            <View style={styles.dateText}>
-              <ThemedText type="small" style={styles.dateLabel}>
-                End Date
-              </ThemedText>
-              <ThemedText type="body">{formatDate(endDate)}</ThemedText>
-            </View>
-          </Pressable>
-          {showEndPicker && (
-            <DateTimePicker
-              testID="dateTimePickerEnd"
-              value={endDate}
-              mode="date"
-              is24Hour={true}
-              display="default"
-              onChange={onEndDateChange}
-            />
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>
-            Settings
-          </ThemedText>
-          <Pressable
-            onPress={toggleApproval}
-            style={[styles.toggle, { backgroundColor: theme.backgroundDefault }]}
-          >
-            <View style={styles.toggleInfo}>
-              <ThemedText type="body">Require Approval</ThemedText>
-              <ThemedText type="small" style={styles.toggleDesc}>
-                Manually approve each registration
-              </ThemedText>
-            </View>
-            <View
-              style={[
-                styles.checkbox,
-                {
-                  backgroundColor: requiresApproval ? theme.primary : "transparent",
-                  borderColor: requiresApproval ? theme.primary : theme.border,
-                },
-              ]}
-            >
-              {requiresApproval ? <Icon name="check" size={14} color="#fff" /> : null}
-            </View>
-          </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.section}>
             <ThemedText type="h4" style={styles.sectionTitle}>
-              Registration Form Fields
+              Date & Time
             </ThemedText>
-            <Pressable onPress={addField} style={[styles.addFieldButton, { backgroundColor: `${theme.primary}15` }]}>
-              <Icon name="plus" size={16} color={theme.primary} />
-              <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-                Add Field
-              </ThemedText>
+            <Pressable onPress={() => setShowStartPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+              <Icon name="calendar" size={18} color={theme.textSecondary} />
+              <View style={styles.dateText}>
+                <ThemedText type="small" style={styles.dateLabel}>
+                  Start Date
+                </ThemedText>
+                <ThemedText type="body">{formatDate(startDate)}</ThemedText>
+              </View>
+            </Pressable>
+            {showStartPicker && (
+              <DateTimePicker
+                testID="dateTimePicker"
+                value={startDate}
+                mode="date"
+                is24Hour={true}
+                display="default"
+                onChange={onStartDateChange}
+              />
+            )}
+
+            <Pressable onPress={() => setShowEndPicker(true)} style={[styles.dateButton, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+              <Icon name="calendar" size={18} color={theme.textSecondary} />
+              <View style={styles.dateText}>
+                <ThemedText type="small" style={styles.dateLabel}>
+                  End Date
+                </ThemedText>
+                <ThemedText type="body">{formatDate(endDate)}</ThemedText>
+              </View>
+            </Pressable>
+            {showEndPicker && (
+              <DateTimePicker
+                testID="dateTimePickerEnd"
+                value={endDate}
+                mode="date"
+                is24Hour={true}
+                display="default"
+                onChange={onEndDateChange}
+              />
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Settings
+            </ThemedText>
+            <Pressable
+              onPress={toggleApproval}
+              style={[styles.toggle, { backgroundColor: theme.backgroundDefault }]}
+            >
+              <View style={styles.toggleInfo}>
+                <ThemedText type="body">Require Approval</ThemedText>
+                <ThemedText type="small" style={styles.toggleDesc}>
+                  Manually approve each registration
+                </ThemedText>
+              </View>
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    backgroundColor: requiresApproval ? theme.primary : "transparent",
+                    borderColor: requiresApproval ? theme.primary : theme.border,
+                  },
+                ]}
+              >
+                {requiresApproval ? <Icon name="check" size={14} color="#fff" /> : null}
+              </View>
             </Pressable>
           </View>
 
-          {formFields.map((field, index) => (
-            <FieldRow
-              key={field.id}
-              field={field}
-              index={index}
-              onRemove={removeField}
-              onUpdate={updateField}
-              theme={theme}
-            />
-          ))}
-        </View>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText type="h4" style={styles.sectionTitle}>
+                Registration Form Fields
+              </ThemedText>
+              <Pressable onPress={addField} style={[styles.addFieldButton, { backgroundColor: `${theme.primary}15` }]}>
+                <Icon name="plus" size={16} color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+                  Add Field
+                </ThemedText>
+              </Pressable>
+            </View>
 
-        {error ? (
-          <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
-            {error}
-          </ThemedText>
-        ) : null}
+            {formFields.map((field, index) => (
+              <FieldRow
+                key={field.id}
+                field={field}
+                index={index}
+                onRemove={removeField}
+                onUpdate={updateField}
+                theme={theme}
+              />
+            ))}
+          </View>
 
-        <Button
-          onPress={handleCreate}
-          disabled={submitMutation.isPending}
-          style={styles.createButton}
-        >
-          {submitMutation.isPending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            event ? "Update Event" : "Create Event"
-          )}
-        </Button>
-      </ScrollView>
+          {error ? (
+            <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
+              {error}
+            </ThemedText>
+          ) : null}
+
+          <Button
+            onPress={handleCreate}
+            disabled={submitMutation.isPending}
+            style={styles.createButton}
+          >
+            {submitMutation.isPending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              event ? "Update Event" : "Create Event"
+            )}
+          </Button>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

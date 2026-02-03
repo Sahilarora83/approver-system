@@ -47,7 +47,7 @@ if (!isExpoGo) {
 }
 
 const linking = {
-  prefixes: [Linking.createURL('/'), 'qrticket://', 'http://192.168.1.107:5000'],
+  prefixes: [Linking.createURL('/'), 'qrticket://', 'https://approver-system.onrender.com'],
   config: {
     screens: {
       Login: 'login',
