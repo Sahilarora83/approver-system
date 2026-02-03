@@ -69,7 +69,7 @@ const FieldRow = memo(function FieldRow({
           {/* Simple Type Toggler for demo */}
           <Pressable
             onPress={() => {
-              const types: FormField['type'][] = ['text', 'number', 'email', 'phone', 'checkbox'];
+              const types: FormField['type'][] = ['text', 'number', 'email', 'phone', 'checkbox', 'dropdown'];
               const nextIndex = (types.indexOf(field.type) + 1) % types.length;
               onUpdate(field.id, { type: types[nextIndex] });
             }}
@@ -79,6 +79,18 @@ const FieldRow = memo(function FieldRow({
             <Icon name="chevron-down" size={14} color={theme.textSecondary} />
           </Pressable>
         </View>
+
+        {(field.type === 'dropdown' || field.type === 'checkbox') && (
+          <View style={{ marginTop: 10 }}>
+            <ThemedText type="small" style={{ marginBottom: 4 }}>Options (comma separated)</ThemedText>
+            <Input
+              value={field.options?.join(', ') || ''}
+              onChangeText={(text) => onUpdate(field.id, { options: text.split(',').map(s => s.trim()).filter(Boolean) })}
+              placeholder="Option A, Option B, Option C"
+              style={{ padding: 8, height: 40 }}
+            />
+          </View>
+        )}
       </View>
       {index >= 3 ? (
         <Pressable onPress={() => onRemove(field.id)} style={styles.removeButton}>

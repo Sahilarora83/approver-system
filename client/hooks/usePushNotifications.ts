@@ -13,6 +13,13 @@ export function usePushNotifications(
     const { user } = useAuth();
 
     useEffect(() => {
+        const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+
+        if (isExpoGo) {
+            console.log('Push Notifications: Completely disabled in Expo Go environment');
+            return;
+        }
+
         if (user) {
             registerForPushNotificationsAsync().then(token => {
                 if (token) {
@@ -46,7 +53,7 @@ export function usePushNotifications(
 async function registerForPushNotificationsAsync() {
     let token;
 
-    const isExpoGo = Constants.executionEnvironment === 'storeClient';
+    const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
     if (isExpoGo) {
         console.log('Push Notifications: Skipped (Remote notifications not supported in Expo Go)');
         return;

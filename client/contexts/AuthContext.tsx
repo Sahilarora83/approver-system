@@ -14,7 +14,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, requiredRole?: string) => Promise<User>;
   signup: (email: string, password: string, name: string, role: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
@@ -34,45 +34,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = async () => {
     try {
       const storedUser = await AsyncStorage.getItem("user");
+      // SIMPLIFIED: No longer checking or using 'token' from storage.
+
       if (storedUser) {
+        console.log(`[Auth Check] Found User in storage: ${storedUser.substring(0, 50)}...`);
+
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
+        setIsLoading(false);
 
-        // Verify session validity with server
+        // Verify session in background (using Cookies)
         try {
-          await apiRequest("GET", "/api/auth/me");
-        } catch (error: any) {
-          // If session is invalid/expired (401), force logout to prevent stuck state
-          if (error.message && error.message.includes("401")) {
-            console.log("Session expired, logging out...");
-            // We verify session failed, so we strictly clear local state
-            setUser(null);
-            await AsyncStorage.removeItem("user");
-            queryClient.clear();
+          const res = await apiRequest("GET", "/api/auth/me");
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data);
+            await AsyncStorage.setItem("user", JSON.stringify(data));
+          } else {
+            console.log("[Auth Check] Session invalid on server (Cookie expired or server restarted).");
+            // Optional: Force logout if server session is gone, or just let them stay logged in "offline" style until an action fails.
+            // For simplicity, we'll keep them logged in optimistically unless they get a 401 on an action.
           }
+        } catch (error: any) {
+          console.log("Background session check failed:", error.message);
         }
+      } else {
+        console.log("[Auth Check] No user found in storage.");
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, requiredRole?: string) => {
     const response = await apiRequest("POST", "/api/auth/login", { email, password });
     const data = await response.json();
-    setUser(data.user);
+
+    if (requiredRole && data.user.role !== requiredRole) {
+      throw new Error(`Access Denied. You are a ${data.user.role}, please login from the ${data.user.role} tab.`);
+    }
+
+    // SIMPLIFIED: Only persist User. Session/Cookie is handled by the network layer.
     await AsyncStorage.setItem("user", JSON.stringify(data.user));
+    // No token saving.
+
     queryClient.clear();
+    setUser(data.user);
+    return data.user;
   }, []);
 
   const signup = useCallback(async (email: string, password: string, name: string, role: string) => {
     const response = await apiRequest("POST", "/api/auth/signup", { email, password, name, role });
     const data = await response.json();
-    setUser(data.user);
+
+    // SIMPLIFIED: Only persist User.
     await AsyncStorage.setItem("user", JSON.stringify(data.user));
+
     queryClient.clear();
+    setUser(data.user);
   }, []);
 
   const logout = useCallback(async () => {
@@ -83,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     await AsyncStorage.removeItem("user");
+    await AsyncStorage.removeItem("token");
     queryClient.clear();
   }, []);
 
@@ -97,8 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       setUser(data);
       await AsyncStorage.setItem("user", JSON.stringify(data));
-    } catch (error) {
-      console.error("Failed to refresh user:", error);
+    } catch (error: any) {
+      // Gracefully handle session expiry during refresh
+      if (error.message && error.message.includes("401")) {
+        console.log("Session check 401 - Keeping local user state active (Zombie Mode).");
+        // FIX: Do NOT log out here. Just let the cached user stay.
+        // If the user tries a write action, that will fail and handle logout if needed.
+        // setUser(null); 
+        // await AsyncStorage.removeItem("user");
+        // await AsyncStorage.removeItem("token");
+        // queryClient.clear();
+      } else {
+        console.error("Failed to refresh user:", error);
+      }
     }
   }, []);
 

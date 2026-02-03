@@ -26,18 +26,24 @@ import * as Notifications from "expo-notifications";
 
 SplashScreen.preventAutoHideAsync();
 
-try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-} catch (e) {
-  console.log("Notification Handler Error:", e);
+import Constants from 'expo-constants';
+
+const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+
+if (!isExpoGo) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch (e) {
+    console.log("Notification Handler Error:", e);
+  }
 }
 
 const linking = {
@@ -160,6 +166,13 @@ export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
+    // IGNORE SPECIFIC EXPO NOTIFICATION LOGS
+    const { LogBox } = require('react-native');
+    LogBox.ignoreLogs([
+      'expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed',
+      'functionality is not fully supported in Expo Go',
+    ]);
+
     async function prepare() {
       try {
         const initialUrl = await Linking.getInitialURL();

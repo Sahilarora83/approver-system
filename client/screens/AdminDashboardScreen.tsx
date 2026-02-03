@@ -30,12 +30,12 @@ export default function AdminDashboardScreen({ navigation }: any) {
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
-    staleTime: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: events, isLoading: eventsLoading, refetch: refetchEvents } = useQuery<(Event & { registrationCount: number })[]>({
     queryKey: ["/api/events"],
-    staleTime: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const isLoading = statsLoading || eventsLoading;

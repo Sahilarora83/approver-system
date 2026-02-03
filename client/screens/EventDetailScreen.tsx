@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Pressable, Share, Modal, ScrollView, Linking, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
+import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Pressable, Share, Modal, ScrollView, Linking, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput as RNTextInput } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -73,22 +73,25 @@ export default function EventDetailScreen({ route, navigation }: any) {
     mutationFn: async () => {
       const url = `/api/events/${eventId}/broadcast`;
       const data = {
-        title: broadcastTitle,
+        title: broadcastTitle || `Update: ${event?.title}`,
         message: includeEventLink
-          ? `${broadcastMessage}\n\nCheck out the event: ${getShareUrl()}`
+          ? `${broadcastMessage}\n\nRegister here: ${getShareUrl()}`
           : broadcastMessage
       };
-      console.log(`[Broadcast] Sending to ${url}:`, data);
-      await apiRequest("POST", url, data);
+
+      console.log(`[Broadcast] Sending to ${url}`);
+      const res = await apiRequest("POST", url, data);
+      return res.json();
     },
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowBroadcastModal(false);
       setBroadcastTitle("");
       setBroadcastMessage("");
-      Alert.alert("Success", "Broadcast sent to all participants");
+      Alert.alert("Success", "Broadcast sent to all participants!");
     },
     onError: (error: any) => {
+      console.error("[Broadcast Error]", error);
       Alert.alert("Error", `Failed to send broadcast: ${error.message || "Unknown error"}`);
     }
   });
@@ -123,14 +126,16 @@ export default function EventDetailScreen({ route, navigation }: any) {
   };
 
   const getShareUrl = () => {
-    const baseUrl = getApiUrl().replace('/api', '').replace(/\/$/, '');
+    const baseUrl = getApiUrl(); // This is the corrected IP:PORT
     return `${baseUrl}/register/${event?.publicLink}`;
   };
 
   const handleCopyLink = async () => {
     if (event?.publicLink) {
-      await Clipboard.setStringAsync(getShareUrl());
+      const url = getShareUrl();
+      await Clipboard.setStringAsync(url);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Link Copied", "Event registration link copied to clipboard!");
     }
   };
 
@@ -565,11 +570,11 @@ export default function EventDetailScreen({ route, navigation }: any) {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
-            <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot, width: '90%', maxWidth: 400, borderRadius: BorderRadius["2xl"] }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, width: '90%', maxWidth: 400, borderRadius: BorderRadius["2xl"] }]}>
               <View style={[styles.modalHeader, { borderBottomWidth: 0, paddingBottom: 0 }]}>
                 <View>
-                  <ThemedText type="h3" style={{ color: theme.primary }}>Broadcast</ThemedText>
-                  <ThemedText type="small" style={{ opacity: 0.6 }}>Announce to all participants</ThemedText>
+                  <ThemedText type="h3" style={{ color: theme.primary, fontWeight: '700' }}>Broadcast</ThemedText>
+                  <ThemedText type="small" style={{ opacity: 0.6 }}>Notify all the participants</ThemedText>
                 </View>
                 <Pressable
                   onPress={() => setShowBroadcastModal(false)}
@@ -582,20 +587,34 @@ export default function EventDetailScreen({ route, navigation }: any) {
               <View style={{ padding: Spacing.lg, gap: Spacing.lg }}>
                 <View style={{ gap: Spacing.md }}>
                   <Input
-                    label="TITLE (OPTIONAL)"
-                    placeholder="e.g. Venue Change or Schedule Update"
+                    label="TITLE (e.g. Venue Change)"
+                    placeholder="Enter broadcast title"
                     value={broadcastTitle}
                     onChangeText={setBroadcastTitle}
                   />
 
-                  <Input
-                    label="MESSAGE"
-                    placeholder="What would you like to say?"
-                    value={broadcastMessage}
-                    onChangeText={setBroadcastMessage}
-                    multiline
-                    style={{ height: 120, textAlignVertical: 'top' }}
-                  />
+                  <View style={{ gap: 8 }}>
+                    <ThemedText type="small" style={{ fontWeight: '600', opacity: 0.7, textTransform: 'uppercase' }}>MESSAGE</ThemedText>
+                    <RNTextInput
+                      style={[
+                        {
+                          height: 120,
+                          textAlignVertical: 'top',
+                          backgroundColor: theme.backgroundSecondary,
+                          borderRadius: BorderRadius.sm,
+                          padding: Spacing.md,
+                          color: theme.text,
+                          borderWidth: 1,
+                          borderColor: theme.border
+                        }
+                      ]}
+                      placeholder="What would you like to say?"
+                      placeholderTextColor={theme.textSecondary}
+                      value={broadcastMessage}
+                      onChangeText={setBroadcastMessage}
+                      multiline
+                    />
+                  </View>
                 </View>
 
                 <Pressable
@@ -607,14 +626,14 @@ export default function EventDetailScreen({ route, navigation }: any) {
                     height: 22,
                     borderRadius: 6,
                     borderWidth: 2,
-                    borderColor: includeEventLink ? theme.primary : theme.textSecondary,
+                    borderColor: includeEventLink ? theme.primary : theme.border,
                     backgroundColor: includeEventLink ? theme.primary : 'transparent',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
                     {includeEventLink && <Feather name="check" size={14} color="#fff" />}
                   </View>
-                  <ThemedText type="small" style={{ fontWeight: '600' }}>Include link to this event</ThemedText>
+                  <ThemedText type="small" style={{ fontWeight: '600' }}>Include registration link</ThemedText>
                 </Pressable>
 
                 <Button

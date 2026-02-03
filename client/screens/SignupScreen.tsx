@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo } from "react";
-import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView, Platform } from "react-native";
+import { StyleSheet, View, Pressable, ActivityIndicator, ScrollView, Platform, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -113,107 +113,113 @@ export default function SignupScreen({ navigation }: any) {
         style={StyleSheet.absoluteFill}
       />
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + Spacing["xl"], paddingBottom: insets.bottom + Spacing["2xl"] },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <Animated.View entering={FadeInUp.duration(800).springify()} style={styles.header}>
-          <ThemedText type="h1" style={styles.title}>
-            Create Account
-          </ThemedText>
-          <ThemedText type="body" style={styles.subtitle}>
-            Join the global event community
-          </ThemedText>
-        </Animated.View>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { flexGrow: 1, paddingBottom: insets.bottom + Spacing["3xl"] }
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ height: insets.top + Spacing["3xl"] }} />
+          <Animated.View entering={FadeInUp.duration(800).springify()} style={styles.header}>
+            <ThemedText type="h1" style={styles.title}>
+              Create Account
+            </ThemedText>
+            <ThemedText type="body" style={styles.subtitle}>
+              Join the global event community
+            </ThemedText>
+          </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(200).duration(800).springify()} style={styles.formSection}>
-          <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            {roles.map((role) => (
-              <RoleTab
-                key={role.key}
-                role={role.key}
-                label={role.label}
-                selected={selectedRole === role.key}
-                onSelect={handleRoleSelect}
-                theme={theme}
+          <Animated.View entering={FadeInDown.delay(200).duration(800).springify()} style={styles.formSection}>
+            <View style={[styles.roleContainer, { backgroundColor: theme.backgroundSecondary }]}>
+              {roles.map((role) => (
+                <RoleTab
+                  key={role.key}
+                  role={role.key}
+                  label={role.label}
+                  selected={selectedRole === role.key}
+                  onSelect={handleRoleSelect}
+                  theme={theme}
+                />
+              ))}
+            </View>
+
+            <View style={styles.form}>
+              <Input
+                label="FULL NAME"
+                placeholder="John Doe"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoComplete="name"
+                style={styles.input}
               />
-            ))}
-          </View>
+              <Input
+                label="EMAIL ADDRESS"
+                placeholder="name@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                style={styles.input}
+              />
+              <Input
+                label="PASSWORD"
+                placeholder="Min 6 characters"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                style={styles.input}
+              />
+              <Input
+                label="CONFIRM PASSWORD"
+                placeholder="Repeat password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                style={styles.input}
+              />
 
-          <View style={styles.form}>
-            <Input
-              label="FULL NAME"
-              placeholder="John Doe"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              autoComplete="name"
-              style={styles.input}
-            />
-            <Input
-              label="EMAIL ADDRESS"
-              placeholder="name@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              style={styles.input}
-            />
-            <Input
-              label="PASSWORD"
-              placeholder="Min 6 characters"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              style={styles.input}
-            />
-            <Input
-              label="CONFIRM PASSWORD"
-              placeholder="Repeat password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              style={styles.input}
-            />
+              {error ? (
+                <Animated.View entering={FadeInDown}>
+                  <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
+                    {error}
+                  </ThemedText>
+                </Animated.View>
+              ) : null}
 
-            {error ? (
-              <Animated.View entering={FadeInDown}>
-                <ThemedText type="small" style={[styles.error, { color: theme.error }]}>
-                  {error}
-                </ThemedText>
-              </Animated.View>
-            ) : null}
+              <Button
+                onPress={handleSignup}
+                disabled={isLoading}
+                style={styles.button}
+                textStyle={{ fontWeight: '800', letterSpacing: 1 }}
+              >
+                {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "JOIN NOW"}
+              </Button>
+            </View>
+          </Animated.View>
 
-            <Button
-              onPress={handleSignup}
-              disabled={isLoading}
-              style={styles.button}
-              textStyle={{ fontWeight: '800', letterSpacing: 1 }}
-            >
-              {isLoading ? <ActivityIndicator color="#fff" size="small" /> : "JOIN NOW"}
-            </Button>
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(400).duration(800).springify()} style={styles.footer}>
-          <ThemedText type="body" style={styles.footerText}>
-            Already have an account?{" "}
-          </ThemedText>
-          <Pressable onPress={() => {
-            navigation.goBack();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          }}>
-            <ThemedText type="link" style={{ fontWeight: '700' }}>Sign In</ThemedText>
-          </Pressable>
-        </Animated.View>
-      </ScrollView>
+          <Animated.View entering={FadeInDown.delay(400).duration(800).springify()} style={styles.footer}>
+            <ThemedText type="body" style={styles.footerText}>
+              Already have an account?{" "}
+            </ThemedText>
+            <Pressable onPress={() => {
+              navigation.goBack();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }}>
+              <ThemedText type="link" style={{ fontWeight: '700' }}>Sign In</ThemedText>
+            </Pressable>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

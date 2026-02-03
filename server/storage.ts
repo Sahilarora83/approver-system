@@ -59,60 +59,6 @@ export interface IStorage {
 export class SupabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const { data, error } = await supabase
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       .from('users')
       .select('*')
       .eq('id', id)
@@ -203,24 +149,33 @@ export class SupabaseStorage implements IStorage {
 
     if (error) throw new Error(error.message);
 
-    const eventsWithCounts = await Promise.all(
-      (events || []).map(async (event) => {
-        const { count } = await supabase
-          .from('registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_id', event.id);
+    if (!events || events.length === 0) return [];
 
-        const transformed = toCamelCase(event);
-        if (event.users) {
-          transformed.organizerProfileImage = event.users.profile_image;
-        }
+    const eventIds = events.map(e => e.id);
 
-        return {
-          ...transformed,
-          registrationCount: count || 0,
-        } as Event & { registrationCount: number };
-      })
-    );
+    // BATCH OPTIMIZATION: Get all counts in one query
+    const { data: counts } = await supabase
+      .from('registrations')
+      .select('event_id')
+      .in('event_id', eventIds);
+
+    // Aggregate counts in memory
+    const countMap = new Map<string, number>();
+    counts?.forEach((r: any) => {
+      countMap.set(r.event_id, (countMap.get(r.event_id) || 0) + 1);
+    });
+
+    const eventsWithCounts = events.map((event) => {
+      const transformed = toCamelCase(event);
+      if (event.users) {
+        transformed.organizerProfileImage = event.users.profile_image;
+      }
+
+      return {
+        ...transformed,
+        registrationCount: countMap.get(event.id) || 0,
+      } as Event & { registrationCount: number };
+    });
 
     return eventsWithCounts;
   }
@@ -234,23 +189,33 @@ export class SupabaseStorage implements IStorage {
 
     if (error) throw new Error(error.message);
 
-    const eventsWithCounts = await Promise.all(
-      (events || []).map(async (event) => {
-        const { count } = await supabase
-          .from('registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_id', event.id);
+    if (!events || events.length === 0) return [];
 
-        const transformed = toCamelCase(event);
-        if (event.users) {
-          transformed.organizerProfileImage = event.users.profile_image;
-        }
-        return {
-          ...transformed,
-          registrationCount: count || 0,
-        } as Event & { registrationCount: number };
-      })
-    );
+    const eventIds = events.map(e => e.id);
+
+    // BATCH OPTIMIZATION: Get all counts in one query
+    const { data: counts } = await supabase
+      .from('registrations')
+      .select('event_id')
+      .in('event_id', eventIds);
+
+    // Aggregate counts in memory
+    const countMap = new Map<string, number>();
+    counts?.forEach((r: any) => {
+      countMap.set(r.event_id, (countMap.get(r.event_id) || 0) + 1);
+    });
+
+    const eventsWithCounts = events.map((event) => {
+      const transformed = toCamelCase(event);
+      if (event.users) {
+        transformed.organizerProfileImage = event.users.profile_image;
+      }
+
+      return {
+        ...transformed,
+        registrationCount: countMap.get(event.id) || 0,
+      } as Event & { registrationCount: number };
+    });
 
     return eventsWithCounts;
   }

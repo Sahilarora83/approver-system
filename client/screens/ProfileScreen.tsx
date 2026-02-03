@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Icon, IconName } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl, resolveImageUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -135,21 +135,19 @@ export default function ProfileScreen({ navigation }: any) {
         {/* User Identity Card */}
         <View style={[styles.identityCard, { backgroundColor: 'transparent' }]}>
           <View style={[styles.avatarContainer, { borderColor: theme.primary }]}>
-            {(user as any)?.profileImage ? (
+            {/* ROBUST IMAGE RESOLVER (Matches EditProfile pattern) */}
+            <View style={styles.avatarWrapperInner}>
               <Image
-                source={{ uri: (user as any).profileImage }}
+                source={{
+                  uri: user?.profileImage
+                    ? `${resolveImageUrl(user.profileImage)}?t=${new Date().getTime()}`
+                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || 'guest'}`
+                }}
                 style={styles.avatarImage}
+                resizeMode="cover"
+                onError={(e) => console.log("[Profile Image] Load Error:", e.nativeEvent.error)}
               />
-            ) : (
-              <LinearGradient
-                colors={[theme.primary, '#4c669f']}
-                style={styles.avatarFill}
-              >
-                <ThemedText style={styles.avatarText}>
-                  {user?.name?.charAt(0).toUpperCase() || "G"}
-                </ThemedText>
-              </LinearGradient>
-            )}
+            </View>
             {user?.role === 'admin' && (
               <View style={styles.verifiedBadge}>
                 <Icon name="check" size={10} color="#fff" />
@@ -264,17 +262,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarWrapperInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 100, // Ensure perfect circle
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
   avatarFill: {
     width: '100%',
     height: '100%',
-    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 50,
   },
   avatarText: {
     fontSize: 40,

@@ -30,19 +30,21 @@ function setupCors(app: express.Application) {
 
     const origin = req.header("origin");
 
-    // Allow localhost origins for Expo web development (any port)
-    const isLocalhost =
-      origin?.startsWith("http://localhost:") ||
-      origin?.startsWith("http://127.0.0.1:") ||
-      origin?.startsWith("http://192.168.");
+    // Allow any origin for development to solve CORS issues on various device IPs
+    const isLocalhost = !origin ||
+      origin.startsWith("http://localhost:") ||
+      origin.startsWith("http://127.0.0.1:") ||
+      origin.startsWith("http://192.168.") ||
+      origin.startsWith("http://10.0.") ||
+      origin.startsWith("http://172.");
 
-    if (origin && (origins.has(origin) || isLocalhost)) {
-      res.header("Access-Control-Allow-Origin", origin);
+    if (origins.has(origin!) || isLocalhost) {
+      res.header("Access-Control-Allow-Origin", origin || "*");
       res.header(
         "Access-Control-Allow-Methods",
-        "GET, POST, PUT, DELETE, OPTIONS",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id, x-user-id");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 

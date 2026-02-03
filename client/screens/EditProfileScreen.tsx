@@ -2,7 +2,7 @@ import React, { useState, useLayoutEffect } from "react";
 import { StyleSheet, View, ScrollView, TextInput as RNTextInput, KeyboardAvoidingView, Platform, Pressable, Image, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, resolveImageUrl } from "@/lib/query-client";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
@@ -24,6 +24,17 @@ export default function EditProfileScreen({ navigation }: any) {
     const [bio, setBio] = useState(user?.bio || "");
     const [image, setImage] = useState<string | null>((user as any)?.profileImage || null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
+
+    // Sync state when user data is refreshed from server
+    React.useEffect(() => {
+        if (user) {
+            setName(user.name);
+            setBio(user.bio || "");
+            if ((user as any).profileImage) {
+                setImage((user as any).profileImage);
+            }
+        }
+    }, [user]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -116,18 +127,13 @@ export default function EditProfileScreen({ navigation }: any) {
                     >
                         <Pressable onPress={pickImage} style={styles.avatarWrapper}>
                             <View style={[styles.avatarContainer, { backgroundColor: theme.backgroundSecondary }]}>
-                                {image || user?.id ? (
-                                    <View style={styles.avatarWrapperInner}>
-                                        <Image
-                                            source={{ uri: image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}` }}
-                                            style={styles.avatar}
-                                        />
-                                    </View>
-                                ) : (
-                                    <ThemedText style={styles.avatarPlaceholderText}>
-                                        {user?.name?.charAt(0).toUpperCase()}
-                                    </ThemedText>
-                                )}
+                                <View style={styles.avatarWrapperInner}>
+                                    <Image
+                                        source={{ uri: image ? resolveImageUrl(image) : resolveImageUrl(user?.profileImage) }}
+                                        style={styles.avatar}
+                                        resizeMode="cover"
+                                    />
+                                </View>
                             </View>
                             <View style={[styles.editBadge, { backgroundColor: theme.primary, borderColor: theme.backgroundRoot }]}>
                                 <Icon name="camera" size={16} color="#fff" />

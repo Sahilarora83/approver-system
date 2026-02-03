@@ -4,6 +4,7 @@ import { apiRequest } from '@/lib/query-client';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 export function useLocalNotificationPoller(onNewNotification?: (notif: any) => void) {
     const { user } = useAuth();
@@ -31,16 +32,22 @@ export function useLocalNotificationPoller(onNewNotification?: (notif: any) => v
             if (latest.id !== storedLastId && !latest.read) {
                 console.log('[LocalNotify] New notification detected:', latest.title);
 
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: latest.title,
-                        body: latest.body,
-                        data: { id: latest.id, type: latest.type },
-                        sound: true, // Enable sound
-                        vibrate: [0, 250, 250, 250], // Add vibration pattern
-                    },
-                    trigger: null, // Show immediately
-                });
+                const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+
+                if (!isExpoGo) {
+                    await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: latest.title,
+                            body: latest.body,
+                            data: { id: latest.id, type: latest.type },
+                            sound: true, // Enable sound
+                            vibrate: [0, 250, 250, 250], // Add vibration pattern
+                        },
+                        trigger: null, // Show immediately
+                    });
+                } else {
+                    console.log('[LocalNotify] Native notification skipped in Expo Go');
+                }
 
                 if (onNewNotification) onNewNotification(latest);
 
