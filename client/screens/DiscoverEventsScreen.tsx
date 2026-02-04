@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { StyleSheet, View, FlatList, Image, Pressable, ScrollView, TextInput, ActivityIndicator } from "react-native";
+import React, { useState, useCallback } from "react";
+import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -8,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
+
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { format } from "date-fns";
 import { useFocusEffect } from "@react-navigation/native";
@@ -15,7 +17,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { resolveImageUrl } from "@/lib/query-client";
 import Animated, { FadeInDown, FadeInUp, Layout } from "react-native-reanimated";
 import { Icon } from "@/components/Icon";
-import { Platform } from "react-native";
+
 
 
 
@@ -30,14 +32,9 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
-        staleTime: 0, // Always fetch fresh data on focus
+        // Using global staleTime of 5 minutes for better performance
     }) as { data: any[]; isLoading: boolean; refetch: any; isFetching: boolean };
 
-    useFocusEffect(
-        React.useCallback(() => {
-            refetch();
-        }, [refetch])
-    );
 
     const safeFormat = (date: any, formatStr: string) => {
         try {
@@ -67,8 +64,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         return matchesSearch;
     });
 
-    const renderEventCard = ({ item: event, index }: { item: any, index: number }) => (
-        <Animated.View entering={FadeInDown.delay(index * 100).springify()}>
+    const renderEventCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
+        <Animated.View entering={FadeInDown.delay(index * 50).duration(400).springify()}>
             <Pressable
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
                 style={({ pressed }) => [
@@ -86,8 +83,10 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         <Image
                             source={{ uri: resolveImageUrl(event.coverImage) }}
                             style={styles.cardImage}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            transition={200}
                         />
+
                     ) : (
                         <LinearGradient
                             colors={[theme.primary, theme.primary + '80']}
@@ -133,7 +132,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                                 <Feather name="users" size={12} color={theme.textSecondary} />
                             </View>
                             <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6 }}>
-                                {Math.floor(Math.random() * 50) + 20} joining
+                                {event.registrationCount || 0} joining
                             </ThemedText>
                         </View>
 
@@ -144,7 +143,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 </View>
             </Pressable>
         </Animated.View>
-    );
+    ), [theme, isDark, navigation]);
+
 
     return (
         <ThemedView style={styles.container}>
@@ -238,10 +238,13 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     { paddingBottom: tabBarHeight + Spacing.xl }
                 ]}
                 showsVerticalScrollIndicator={false}
-                windowSize={10}
+                windowSize={5}
+                maxToRenderPerBatch={5}
+                initialNumToRender={5}
                 removeClippedSubviews={Platform.OS === 'android'}
                 refreshing={isFetching}
                 onRefresh={refetch}
+
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         {!isLoading && !isFetching && (

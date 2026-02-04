@@ -82,23 +82,13 @@ export default function ProfileScreen({ navigation }: any) {
   }, [navigation]);
 
   const handleLogout = useCallback(async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    await logout();
+    // Instant feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // This updates the global 'user' state to null, 
+    // which triggers RootStackNavigator to show LoginScreen instantly.
+    logout();
+  }, [logout]);
 
-    // Ensure we reset the navigation stack securely
-    if (navigationRef.isReady()) {
-      navigationRef.reset({
-        index: 0,
-        routes: [{ name: "Login" }],
-      });
-    } else {
-      // Fallback if not ready immediately (rare case)
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Login" }],
-      });
-    }
-  }, [logout, navigation]);
 
   const getRoleLabel = (role: string) => {
     switch (role) {

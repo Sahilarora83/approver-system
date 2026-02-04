@@ -17,7 +17,7 @@ import { FloatingNotification } from "@/components/FloatingNotification";
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors } from "@/constants/theme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -66,20 +66,34 @@ const linking = {
 
 function NotificationWrapper({ children }: { children: React.ReactNode }) {
   const [activeNotification, setActiveNotification] = useState<any>(null);
+  const { user } = useAuth();
 
   const handleNotificationTap = (data: any) => {
+
     if (!data || !navigationRef.isReady()) return;
 
     console.log("Handling Notification Tap:", data);
+    const storedUser = user; // Use current user from AuthContext
 
-    if (data.type === 'new_event' && data.relatedId) {
-      navigationRef.navigate('EventDetail', { eventId: data.relatedId });
-    } else if (data.type === 'broadcast' && data.relatedId) {
-      navigationRef.navigate('EventDetail', { eventId: data.relatedId });
+    if (data.type === 'new_event' || data.type === 'broadcast') {
+      if (storedUser?.role === 'admin') {
+        navigationRef.navigate('EventDetail', { eventId: data.relatedId });
+      } else {
+        // Participants use ParticipantEventDetail inside DiscoverStack
+        (navigationRef.navigate as any)('ParticipantMain', {
+          screen: 'DiscoverTab',
+          params: {
+            screen: 'ParticipantEventDetail',
+            params: { eventId: data.relatedId }
+          }
+        });
+
+      }
     } else if (data.type?.startsWith('registration_') && data.relatedId) {
       navigationRef.navigate('TicketView', { registrationId: data.relatedId });
     }
   };
+
 
   usePushNotifications(
     (notification) => {
@@ -177,13 +191,13 @@ export default function App() {
       try {
         const initialUrl = await Linking.getInitialURL();
         console.log('App launched with URL:', initialUrl);
-        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (e) {
         console.warn("App preparation error:", e);
       } finally {
         setAppIsReady(true);
       }
     }
+
 
     const validUrl = Linking.addEventListener('url', (e) => {
       console.log('Deep Link Event:', e.url);

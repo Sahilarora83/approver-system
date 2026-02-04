@@ -143,7 +143,7 @@ export class SupabaseStorage implements IStorage {
   async getEvents(organizerId: string): Promise<(Event & { registrationCount: number })[]> {
     const { data: events, error } = await supabase
       .from('events')
-      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .select('*, users!events_organizer_id_fkey(profile_image), registrations(count)')
       .eq('organizer_id', organizerId)
       .order('created_at', { ascending: false });
 
@@ -151,39 +151,24 @@ export class SupabaseStorage implements IStorage {
 
     if (!events || events.length === 0) return [];
 
-    const eventIds = events.map(e => e.id);
-
-    // BATCH OPTIMIZATION: Get all counts in one query
-    const { data: counts } = await supabase
-      .from('registrations')
-      .select('event_id')
-      .in('event_id', eventIds);
-
-    // Aggregate counts in memory
-    const countMap = new Map<string, number>();
-    counts?.forEach((r: any) => {
-      countMap.set(r.event_id, (countMap.get(r.event_id) || 0) + 1);
-    });
-
-    const eventsWithCounts = events.map((event) => {
-      const transformed = toCamelCase(event);
+    return events.map((event: any) => {
+      const transformed = toCamelCase(event) as any;
       if (event.users) {
         transformed.organizerProfileImage = event.users.profile_image;
       }
 
       return {
         ...transformed,
-        registrationCount: countMap.get(event.id) || 0,
+        registrationCount: event.registrations?.[0]?.count || 0,
       } as Event & { registrationCount: number };
     });
 
-    return eventsWithCounts;
   }
 
   async getAllEvents(limit: number = 20, offset: number = 0): Promise<(Event & { registrationCount: number })[]> {
     const { data: events, error } = await supabase
       .from('events')
-      .select('*, users!events_organizer_id_fkey(profile_image)')
+      .select('*, users!events_organizer_id_fkey(profile_image), registrations(count)')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -191,33 +176,18 @@ export class SupabaseStorage implements IStorage {
 
     if (!events || events.length === 0) return [];
 
-    const eventIds = events.map(e => e.id);
-
-    // BATCH OPTIMIZATION: Get all counts in one query
-    const { data: counts } = await supabase
-      .from('registrations')
-      .select('event_id')
-      .in('event_id', eventIds);
-
-    // Aggregate counts in memory
-    const countMap = new Map<string, number>();
-    counts?.forEach((r: any) => {
-      countMap.set(r.event_id, (countMap.get(r.event_id) || 0) + 1);
-    });
-
-    const eventsWithCounts = events.map((event) => {
-      const transformed = toCamelCase(event);
+    return events.map((event: any) => {
+      const transformed = toCamelCase(event) as any;
       if (event.users) {
         transformed.organizerProfileImage = event.users.profile_image;
       }
 
       return {
         ...transformed,
-        registrationCount: countMap.get(event.id) || 0,
+        registrationCount: event.registrations?.[0]?.count || 0,
       } as Event & { registrationCount: number };
     });
 
-    return eventsWithCounts;
   }
 
   async getEvent(id: string): Promise<Event | undefined> {

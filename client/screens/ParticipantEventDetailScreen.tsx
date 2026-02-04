@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { StyleSheet, View, ScrollView, Image, Pressable, Linking, Dimensions, Platform, ActivityIndicator } from "react-native";
+import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Modal, Alert } from "react-native";
+import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, resolveImageUrl } from "@/lib/query-client";
+import { apiRequest, resolveImageUrl, queryClient } from "@/lib/query-client";
 
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns";
-import * as WebBrowser from "expo-web-browser";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-
+import MapView, { Marker } from "react-native-maps";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
@@ -18,7 +17,6 @@ import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/contexts/AuthContext";
-import { Modal, Alert } from "react-native";
 import * as Clipboard from 'expo-clipboard';
 import Svg, { Path } from "react-native-svg";
 
@@ -34,18 +32,26 @@ const COLORS = {
 };
 
 export default function ParticipantEventDetailScreen({ route, navigation }: any) {
-    const { eventId } = route.params;
+    const { eventId } = route?.params || {};
+    if (!eventId) {
+        return (
+            <ThemedView style={styles.loadingContainer}>
+                <ThemedText>Event not found</ThemedText>
+                <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
+                    <ThemedText style={{ color: COLORS.primary }}>Go Back</ThemedText>
+                </Pressable>
+            </ThemedView>
+        );
+    }
+
     const insets = useSafeAreaInsets();
     const { theme, isDark } = useTheme();
     const { user } = useAuth();
     const [showShareModal, setShowShareModal] = useState(false);
 
-    let tabBarHeight = 0;
-    try {
-        tabBarHeight = useBottomTabBarHeight();
-    } catch (e) {
-        tabBarHeight = 0;
-    }
+    // Use insets.bottom directly for safe padding at the bottom
+    const tabBarHeight = insets.bottom > 0 ? insets.bottom + 60 : 80;
+
 
     const safeFormat = (date: any, formatStr: string) => {
         try {
@@ -58,23 +64,20 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         }
     };
 
-
-
     const { data: event, isLoading, refetch: refetchEvent } = useQuery({
         queryKey: [`/api/events/${eventId}`],
         enabled: !!eventId,
     }) as { data: any; isLoading: boolean; refetch: any };
 
-    // Fetch real-time attendance count
     const { data: attendanceData, refetch: refetchAttendance } = useQuery({
         queryKey: [`/api/events/${eventId}/registrations/count`],
         queryFn: async () => {
             try {
                 const res = await apiRequest("GET", `/api/events/${eventId}/registrations`);
                 const registrations = await res.json();
-                const approvedRegistrations = registrations.filter((r: any) =>
+                const approvedRegistrations = Array.isArray(registrations) ? registrations.filter((r: any) =>
                     ['approved', 'checked_in', 'checked_out'].includes(r.status)
-                );
+                ) : [];
                 return {
                     count: approvedRegistrations.length,
                     registrations: approvedRegistrations
@@ -84,52 +87,34 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
             }
         },
         enabled: !!eventId,
-        staleTime: 0, // Always fetch fresh
     }) as { data: any; refetch: any };
 
     const registrationStatusQuery = useQuery({
-        queryKey: ["registration-status", eventId || "no-id", user?.id || "no-user", user?.email || "no-email"],
+        queryKey: ["registration-status", eventId || "no-id", user?.id || "no-user"],
         queryFn: async () => {
-            console.log('[Query] Starting registration status check...');
-            console.log('[Query] Event ID:', eventId, 'User email:', user?.email);
-
-            if (!eventId) return null;
-
-            const emailParam = user?.email ? `?email=${encodeURIComponent(user.email)}` : '';
-            const url = `/api/events/${eventId}/registration-status${emailParam}`;
-
-            console.log('[Query] Fetching URL:', url);
-            const res = await apiRequest("GET", url);
-            console.log('[Query] Response status:', res.status);
-            const data = await res.json();
-            console.log('[Query] Response data:', data);
-            return data;
+            if (!eventId || !user?.email) return null;
+            const res = await apiRequest("GET", `/api/events/${eventId}/registration-status?email=${encodeURIComponent(user.email)}`);
+            return res.json();
         },
         enabled: !!eventId && !!user?.email,
-        retry: 1,
-        staleTime: 0,
     });
 
-    // Geocode location to coordinates
-    const [mapRegion, setMapRegion] = React.useState({
-        latitude: 28.6139, // Default Delhi
+    const [mapRegion, setMapRegion] = useState({
+        latitude: 28.6139,
         longitude: 77.2090,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
     });
 
-    React.useEffect(() => {
+    useEffect(() => {
         const geocodeLocation = async () => {
             if (!event?.location) return;
-
             try {
-                // Using Google Maps Geocoding API for accurate results
                 const response = await fetch(
                     `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(event.location)}&key=AIzaSyBH1Cl0wkbKTVR5Qmyv8_3UGZe-Er_nEDE`
                 );
                 const data = await response.json();
-
-                if (data.status === 'OK' && data.results && data.results.length > 0) {
+                if (data.status === 'OK' && data.results?.[0]) {
                     const { lat, lng } = data.results[0].geometry.location;
                     setMapRegion({
                         latitude: lat,
@@ -137,41 +122,30 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         latitudeDelta: 0.05,
                         longitudeDelta: 0.05,
                     });
-                    console.log('[Map] Geocoded location:', event.location, '→', lat, lng);
-                } else {
-                    console.log('[Map] Geocoding returned no results, using default');
                 }
             } catch (error) {
-                console.log('[Map] Geocoding failed, using default location');
+                console.log('[Map] Geocoding failed');
             }
         };
-
         geocodeLocation();
     }, [event?.location]);
-
-    useEffect(() => {
-        if (registrationStatusQuery.error) {
-            console.error(`[Query Error] Registration status failed:`, registrationStatusQuery.error);
-        }
-    }, [registrationStatusQuery.error]);
 
     const registration = registrationStatusQuery.data?.registration;
     const registrationStatus = registration?.status ? String(registration.status).toLowerCase() : "none";
     const isRegLoading = registrationStatusQuery.isLoading && !registrationStatusQuery.data;
 
-    // Refetch on focus
     useFocusEffect(
         useCallback(() => {
-            refetchEvent();
-            refetchAttendance();
-            registrationStatusQuery.refetch();
-        }, [refetchEvent, refetchAttendance, registrationStatusQuery])
+            refetchEvent?.();
+            refetchAttendance?.();
+            registrationStatusQuery.refetch?.();
+        }, [refetchEvent, refetchAttendance])
     );
 
-    // Follow logic
     const { data: followStatus, refetch: refetchFollow } = useQuery({
         queryKey: [`/api/user/follow/${event?.organizerId}/status`],
         queryFn: async () => {
+            if (!event?.organizerId) return { following: false };
             const res = await apiRequest("GET", `/api/user/follow/${event.organizerId}/status`);
             return res.json();
         },
@@ -185,7 +159,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         },
         onSuccess: () => {
             refetchFollow();
-            // Also invalidate profile stats to update Following count
             queryClient.invalidateQueries({ queryKey: ["userStats"] });
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
@@ -196,51 +169,21 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const isRejected = registrationStatus === "rejected";
     const isRegistered = isPending || isApproved || isRejected;
 
-    // Debug logging
-    useEffect(() => {
-        console.log(`[EventDetail] Query enabled: ${!!eventId && !!user?.email}`);
-        console.log(`[EventDetail] EventId: ${eventId}, User email: ${user?.email}`);
-        console.log(`[EventDetail] Registration data:`, registrationStatusQuery.data);
-        console.log(`[EventDetail] Registration status: ${registrationStatus}`);
-        console.log(`[EventDetail] isPending: ${isPending}, isApproved: ${isApproved}, isRegistered: ${isRegistered}`);
-    }, [registrationStatusQuery.data, registrationStatus, eventId, user?.email, isPending, isApproved, isRegistered]);
-
-    useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
-            if (refetchEvent) refetchEvent();
-            // Always refetch registration status and attendance on focus
-            registrationStatusQuery.refetch();
-            refetchAttendance();
-        });
-        return unsubscribe;
-    }, [navigation, refetchEvent, refetchAttendance]);
-
-    useEffect(() => {
-        if (isApproved) {
-            if (refetchEvent) refetchEvent();
-        }
-    }, [isApproved]);
-    // const isFirstLoad = isLoadingStatus && !regStats; // Removed isFirstLoad
-
     if (isLoading || !event) {
         return (
             <ThemedView style={styles.loadingContainer}>
-                <ThemedText>Loading...</ThemedText>
+                <ActivityIndicator size="large" color={theme.primary} />
             </ThemedView>
         );
     }
 
     const handleRegister = () => {
         if (!event) return;
-
         if (isApproved) {
             navigation.navigate("TicketsTab", { screen: "MyTickets" });
             return;
         }
-
         if (isPending || isRejected) return;
-
-        // Not registered
         const link = event.publicLink || event.public_link;
         if (link) {
             navigation.navigate("RegisterEvent", { eventLink: link });
@@ -257,7 +200,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
     const isButtonDisabled = isRegLoading || isPending || isRejected;
     const handleOpenMap = () => {
-        const query = encodeURIComponent(event.location || "");
+        if (!event.location) return;
+        const query = encodeURIComponent(event.location);
         Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
     };
 
@@ -268,10 +212,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 contentContainerStyle={{ paddingBottom: 20 + tabBarHeight }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header Image */}
                 <View style={styles.imageContainer}>
                     {event.coverImage ? (
-                        <Image source={{ uri: resolveImageUrl(event.coverImage) }} style={styles.headerImage} resizeMode="cover" />
+                        <Image source={{ uri: resolveImageUrl(event.coverImage) }} style={styles.headerImage} contentFit="cover" transition={200} />
                     ) : (
                         <LinearGradient colors={['#4c669f', '#3b5998', '#192f6a']} style={styles.headerImage}>
                             <Feather name="calendar" size={60} color="rgba(255,255,255,0.3)" />
@@ -292,7 +235,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 </View>
 
                 <View style={styles.mainContent}>
-                    {/* Featured Tag */}
                     <View style={styles.featuredBadge}>
                         <Feather name="home" size={14} color="#FFA500" />
                         <ThemedText style={styles.featuredText}>Featured in {event.location?.split(',').pop()?.trim() || "Local"}</ThemedText>
@@ -312,11 +254,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                     {safeFormat(event.startDate, "h:mm a")} - {event.endDate ? safeFormat(event.endDate, "h:mm a") : "Late"}
                                 </ThemedText>
                             </View>
-
                         </View>
                     </View>
 
-                    {/* Registration Card */}
                     <View style={styles.registrationCard}>
                         <ThemedText style={styles.regHeader}>Registration</ThemedText>
 
@@ -379,7 +319,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         </Pressable>
                     </View>
 
-                    {/* About Section */}
                     <View style={styles.sectionHeaderNew}>
                         <ThemedText style={styles.sectionTitleNew}>About Event</ThemedText>
                     </View>
@@ -387,7 +326,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         {event.description || "No description provided."}
                     </ThemedText>
 
-                    {/* Location & Map Section */}
                     <View style={styles.sectionHeaderNew}>
                         <ThemedText style={styles.sectionTitleNew}>Location</ThemedText>
                     </View>
@@ -398,26 +336,10 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
                         {event.location && (
                             <Pressable onPress={handleOpenMap} style={styles.mapContainerNew}>
-                                {/* Real interactive map using react-native-maps */}
-                                <MapView
-                                    style={styles.mapImageNew}
-                                    provider={PROVIDER_GOOGLE}
-                                    region={mapRegion}
-                                    scrollEnabled={false}
-                                    zoomEnabled={false}
-                                    pitchEnabled={false}
-                                    rotateEnabled={false}
-                                    pointerEvents="none"
-                                >
-                                    <Marker
-                                        coordinate={{
-                                            latitude: mapRegion.latitude,
-                                            longitude: mapRegion.longitude,
-                                        }}
-                                        title={event.location}
-                                        pinColor="#3D5CFF"
-                                    />
-                                </MapView>
+                                <View style={[styles.mapImageNew, { backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }]}>
+                                    <Feather name="map" size={40} color="rgba(255,255,255,0.1)" />
+                                    <ThemedText style={{ color: 'rgba(255,255,255,0.3)', marginTop: 12 }}>Map Preview Unavailable</ThemedText>
+                                </View>
                                 <View style={styles.mapOverlayNew}>
                                     <View style={styles.mapBadgeNew}>
                                         <Feather name="navigation" size={14} color={COLORS.primary} />
@@ -426,9 +348,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 </View>
                             </Pressable>
                         )}
+
                     </View>
 
-                    {/* Hosted By Section */}
                     <View style={styles.sectionHeaderNew}>
                         <ThemedText style={styles.sectionTitleNew}>Hosted By</ThemedText>
                     </View>
@@ -455,28 +377,21 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                     <ThemedText style={styles.hostNameSmall}>{host.name}</ThemedText>
                                     <View style={styles.socialIconsSmall}>
                                         {host.instagram ? (
-                                            <Pressable onPress={() => Linking.openURL(host.instagram.startsWith('http') ? host.instagram : `https://instagram.com/${host.instagram.replace('@', '')}`)}>
+                                            <Pressable onPress={() => Linking.openURL(host.instagram)}>
                                                 <Feather name="instagram" size={16} color={COLORS.textSecondary} style={{ marginRight: 10 }} />
                                             </Pressable>
-                                        ) : (
-                                            <Feather name="instagram" size={16} color={COLORS.textSecondary} style={{ marginRight: 10, opacity: 0.3 }} />
-                                        )}
+                                        ) : null}
                                         {host.twitter ? (
-                                            <Pressable onPress={() => Linking.openURL(host.twitter.startsWith('http') ? host.twitter : `https://twitter.com/${host.twitter.replace('@', '')}`)}>
+                                            <Pressable onPress={() => Linking.openURL(host.twitter)}>
                                                 <Feather name="twitter" size={16} color={COLORS.textSecondary} style={{ marginRight: 10 }} />
                                             </Pressable>
-                                        ) : (
-                                            <Feather name="twitter" size={16} color={COLORS.textSecondary} style={{ marginRight: 10, opacity: 0.3 }} />
-                                        )}
+                                        ) : null}
                                         {host.linkedin ? (
-                                            <Pressable onPress={() => Linking.openURL(host.linkedin.startsWith('http') ? host.linkedin : `https://linkedin.com/in/${host.linkedin.replace('@', '')}`)}>
+                                            <Pressable onPress={() => Linking.openURL(host.linkedin)}>
                                                 <Feather name="linkedin" size={16} color={COLORS.textSecondary} />
                                             </Pressable>
-                                        ) : (
-                                            <Feather name="linkedin" size={16} color={COLORS.textSecondary} style={{ opacity: 0.3 }} />
-                                        )}
+                                        ) : null}
 
-                                        {/* Follow Button - only show for primary host (main organizer) */}
                                         {index === 0 && user?.id !== event.organizerId && (
                                             <Pressable
                                                 onPress={() => followMutation.mutate()}
@@ -524,13 +439,12 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         })()}
                     </View>
 
-                    {/* Attendance - Real-time */}
                     <View style={styles.sectionHeaderNew}>
                         <ThemedText style={styles.sectionTitleNew}>Attendance</ThemedText>
                     </View>
                     <View style={styles.attendanceRow}>
                         <ThemedText style={styles.goingCount}>
-                            {attendanceData?.count || event.attendeesCount || event._count?.registrations || 0} Going
+                            {attendanceData?.count || 0} Going
                         </ThemedText>
                         <View style={styles.avatarPile}>
                             {(attendanceData?.registrations || []).slice(0, 5).map((reg: any, i: number) => (
@@ -585,7 +499,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 color="#25D366"
                                 iconComponent={<WhatsAppSVG />}
                                 onPress={() => {
-                                    const link = event.publicLink || `https://myapp.com/events/${eventId}`;
+                                    const link = event.publicLink || event.public_link;
                                     Linking.openURL(`whatsapp://send?text=${encodeURIComponent(`Check out this event: ${event.title} \n${link}`)}`);
                                 }}
                             />
@@ -594,7 +508,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 color="#000000"
                                 iconComponent={<TwitterSVG />}
                                 onPress={() => {
-                                    const link = event.publicLink || `https://myapp.com/events/${eventId}`;
+                                    const link = event.publicLink || event.public_link;
                                     Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out this event: ${event.title}`)}&url=${encodeURIComponent(link)}`);
                                 }}
                             />
@@ -603,7 +517,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 color="#0A66C2"
                                 iconComponent={<LinkedInSVG />}
                                 onPress={() => {
-                                    const link = event.publicLink || `https://myapp.com/events/${eventId}`;
+                                    const link = event.publicLink || event.public_link;
                                     Linking.openURL(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`);
                                 }}
                             />
@@ -612,7 +526,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 color="#555"
                                 iconComponent={<Feather name="link" size={24} color="#fff" />}
                                 onPress={async () => {
-                                    const link = event.publicLink || `https://myapp.com/events/${eventId}`;
+                                    const link = event.publicLink || event.public_link;
                                     await Clipboard.setStringAsync(link);
                                     Alert.alert("Copied", "Event link copied to clipboard");
                                     setShowShareModal(false);
@@ -657,344 +571,63 @@ const LinkedInSVG = () => (
 );
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    imageContainer: {
-        height: 300,
-        width: '100%',
-        position: 'relative',
-    },
-    headerImage: {
-        width: '100%',
-        height: 300,
-    },
-    backButton: {
-        position: 'absolute',
-        left: 20,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    mainContent: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    featuredBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,165,0,0.1)',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        marginBottom: 16,
-    },
-    featuredText: {
-        color: '#A0A4B8',
-        fontSize: 12,
-        fontWeight: '600',
-        marginHorizontal: 6,
-    },
-    eventTitleText: {
-        fontSize: 28,
-        fontWeight: '900',
-        color: '#FFF',
-        marginBottom: 24,
-    },
-    metaInfo: {
-        gap: 20,
-        marginBottom: 30,
-    },
-    metaLine: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    metaIconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(160,164,184,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    metaMainText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    metaSubText: {
-        fontSize: 13,
-        color: '#A0A4B8',
-        marginTop: 2,
-    },
-    registrationCard: {
-        backgroundColor: COLORS.card,
-        borderRadius: 24,
-        padding: 20,
-        marginBottom: 30,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    regHeader: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#A0A4B8',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 16,
-    },
-    approvalInfo: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(160,164,184,0.1)',
-        padding: 12,
-        borderRadius: 12,
-        marginBottom: 16,
-    },
-    approvalIcon: {
-        marginRight: 10,
-    },
-    approvalTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    approvalDesc: {
-        fontSize: 12,
-        color: '#A0A4B8',
-    },
-    welcomeText: {
-        fontSize: 15,
-        color: '#FFF',
-        fontWeight: '600',
-        marginBottom: 16,
-    },
-    userSnippet: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 20,
-    },
-    userAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    userName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    userEmail: {
-        fontSize: 13,
-        color: '#A0A4B8',
-    },
-    regButtonInner: {
-        height: 54,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    regButtonInnerText: {
-        color: '#000',
-        fontWeight: '900',
-        fontSize: 16,
-    },
-    sectionHeaderNew: {
-        marginBottom: 12,
-        marginTop: 10,
-    },
-    sectionTitleNew: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#A0A4B8',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#1C1F35',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 24,
-        paddingBottom: 40,
-    },
-    modalIndicator: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#333',
-        borderRadius: 2,
-        alignSelf: 'center',
-        marginBottom: 20,
-    },
-    modalHeader: {
-        marginBottom: 24,
-        alignItems: 'center',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    shareGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 24,
-    },
-    shareButton: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    shareIconCircle: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 4,
-        elevation: 4,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-    },
-    shareButtonText: {
-        fontSize: 12,
-        color: '#A0A4B8',
-    },
-    cancelButton: {
-        backgroundColor: '#2A2D45',
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    cancelButtonText: {
-        color: '#FFF',
-        fontWeight: '600',
-        fontSize: 16,
-    },
-    descriptionNew: {
-        fontSize: 15,
-        lineHeight: 24,
-        color: '#FFF',
-        opacity: 0.9,
-        marginBottom: 30,
-    },
-    locationInfoCard: {
-        marginTop: 10,
-        marginBottom: 30,
-    },
-    locationNameText: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#FFF',
-        marginBottom: 6,
-    },
-    locationAddressText: {
-        fontSize: 14,
-        color: '#A0A4B8',
-        lineHeight: 20,
-        marginBottom: 20,
-    },
-    mapContainerNew: {
-        height: 180,
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-    mapImageNew: {
-        width: '100%',
-        height: '100%',
-    },
-    mapOverlayNew: {
-        ...StyleSheet.absoluteFillObject,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    mapMarkerNew: {
-        padding: 8,
-        borderRadius: 20,
-    },
-    mapBadgeNew: {
-        position: 'absolute',
-        bottom: 12,
-        right: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    hostsList: {
-        gap: 16,
-        marginBottom: 30,
-    },
-    hostRowSmall: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    hostAvatarSmall: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: COLORS.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    hostInitialSmall: {
-        color: '#FFF',
-        fontWeight: 'bold',
-    },
-    hostAvatarImageSmall: {
-        width: '100%',
-        height: '100%',
-    },
-    hostNameSmall: {
-        flex: 1,
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    socialIconsSmall: {
-        flexDirection: 'row',
-    },
-    attendanceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 40,
-    },
-    goingCount: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    avatarPile: {
-        flexDirection: 'row',
-    },
-    pileAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: COLORS.background,
-        backgroundColor: '#444',
-    },
+    container: { flex: 1 },
+    loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    imageContainer: { height: 300, width: '100%', position: 'relative' },
+    headerImage: { width: '100%', height: 300 },
+    backButton: { position: 'absolute', left: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
+    mainContent: { paddingHorizontal: 20, paddingTop: 20 },
+    featuredBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,165,0,0.1)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 16 },
+    featuredText: { color: '#A0A4B8', fontSize: 12, fontWeight: '600', marginHorizontal: 6 },
+    eventTitleText: { fontSize: 28, fontWeight: '900', color: '#FFF', marginBottom: 24 },
+    metaInfo: { gap: 20, marginBottom: 30 },
+    metaLine: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    metaIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(160,164,184,0.1)', alignItems: 'center', justifyContent: 'center' },
+    metaMainText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+    metaSubText: { fontSize: 13, color: '#A0A4B8', marginTop: 2 },
+    registrationCard: { backgroundColor: COLORS.card, borderRadius: 24, padding: 20, marginBottom: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    regHeader: { fontSize: 14, fontWeight: '800', color: '#A0A4B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
+    approvalInfo: { flexDirection: 'row', backgroundColor: 'rgba(160,164,184,0.1)', padding: 12, borderRadius: 12, marginBottom: 16 },
+    approvalIcon: { marginRight: 10 },
+    approvalTitle: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+    approvalDesc: { fontSize: 12, color: '#A0A4B8' },
+    welcomeText: { fontSize: 15, color: '#FFF', fontWeight: '600', marginBottom: 16 },
+    userSnippet: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+    userAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+    userName: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+    userEmail: { fontSize: 13, color: '#A0A4B8' },
+    regButtonInner: { borderRadius: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+    regButtonInnerText: { fontSize: 16, fontWeight: '800' },
+    sectionHeaderNew: { marginBottom: 16 },
+    sectionTitleNew: { fontSize: 20, fontWeight: '800', color: '#FFF' },
+    descriptionNew: { fontSize: 16, lineHeight: 24, color: '#A0A4B8', marginBottom: 32 },
+    locationInfoCard: { backgroundColor: COLORS.card, borderRadius: 24, padding: 20, marginBottom: 32 },
+    locationNameText: { fontSize: 18, fontWeight: '800', color: '#FFF', marginBottom: 4 },
+    locationAddressText: { fontSize: 14, color: '#A0A4B8', marginBottom: 20 },
+    mapContainerNew: { height: 200, borderRadius: 16, overflow: 'hidden', position: 'relative' },
+    mapImageNew: { width: '100%', height: '100%' },
+    mapOverlayNew: { position: 'absolute', bottom: 12, right: 12 },
+    mapBadgeNew: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+    hostsList: { gap: 16, marginBottom: 32 },
+    hostRowSmall: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    hostAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+    hostAvatarImageSmall: { width: '100%', height: '100%' },
+    hostInitialSmall: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+    hostNameSmall: { fontSize: 16, fontWeight: '700', color: '#FFF', flex: 1 },
+    socialIconsSmall: { flexDirection: 'row', alignItems: 'center' },
+    attendanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 },
+    goingCount: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+    avatarPile: { flexDirection: 'row' },
+    pileAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: COLORS.background },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: COLORS.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+    modalIndicator: { width: 40, height: 5, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, alignSelf: 'center', marginBottom: 24 },
+    modalHeader: { marginBottom: 24 },
+    modalTitle: { fontSize: 24, fontWeight: '900', color: '#FFF', textAlign: 'center' },
+    shareGrid: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 32 },
+    shareButton: { alignItems: 'center', gap: 12 },
+    shareIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+    shareButtonText: { fontSize: 12, fontWeight: '700', color: '#A0A4B8' },
+    cancelButton: { paddingVertical: 16, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center' },
+    cancelButtonText: { fontSize: 16, fontWeight: '700', color: '#FFF' },
 });

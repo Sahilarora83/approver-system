@@ -97,16 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await apiRequest("POST", "/api/auth/logout", {});
-    } catch (error) {
-      console.error("Logout API call failed:", error);
-    }
+    // Clear state immediately for instant UI response
     setUser(null);
-    await AsyncStorage.removeItem("user");
-    await AsyncStorage.removeItem("token");
     queryClient.clear();
+
+    // Secondary async cleanup
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem("user"),
+        AsyncStorage.removeItem("token"),
+        apiRequest("POST", "/api/auth/logout", {}).catch(() => { }),
+      ]);
+    } catch (e) {
+      console.error("Cleanup error:", e);
+    }
   }, []);
+
 
   const updateUser = useCallback(async (updatedUser: User) => {
     setUser(updatedUser);
