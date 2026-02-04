@@ -47,7 +47,7 @@ if (!isExpoGo) {
 }
 
 const linking = {
-  prefixes: [Linking.createURL('/'), 'qrticket://', 'https://approver-system.onrender.com'],
+  prefixes: [Linking.createURL('/'), 'qrticket://', 'https://horizontal-nedda-technocompany-d67bfb10.koyeb.app'],
   config: {
     screens: {
       Login: 'login',

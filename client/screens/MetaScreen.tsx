@@ -52,9 +52,15 @@ const AboutContent = ({ theme }: any) => (
                 Global Scale is a comprehensive event management platform designed for efficiency and reliability.
                 Our mission is to provide tools that help organizers manage events of any size with ease.
             </ThemedText>
-            <ThemedText style={[styles.standardText, { marginTop: Spacing.md }]}>
-                Built with modern technology to ensure a seamless experience for both organizers and participants.
-            </ThemedText>
+
+            <View style={{ marginTop: Spacing.xl, alignItems: 'center', gap: Spacing.sm }}>
+                <ThemedText style={[styles.standardText, { fontWeight: 'bold' }]}>
+                    Developed by Sahil
+                </ThemedText>
+                <ThemedText style={styles.standardText}>
+                    Founder of this app: Sujay Kumar
+                </ThemedText>
+            </View>
         </View>
 
         <ThemedText style={styles.copyright}>© 2026 Global Scale App. All rights reserved.</ThemedText>

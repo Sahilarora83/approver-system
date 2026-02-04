@@ -33,7 +33,7 @@ export function resolveImageUrl(path: string | null | undefined): string {
   if (path.startsWith("http") || path.startsWith("file://") || path.startsWith("data:") || path.startsWith("content://")) {
     if (path.startsWith("http")) {
       const baseUrl = getApiUrl();
-      // Get the current hostname (e.g. "approver-system.onrender.com")
+      // Get the current hostname (e.g. "horizontal-nedda-technocompany-d67bfb10.koyeb.app")
       const currentHost = baseUrl.split("://")[1];
       const protocol = baseUrl.split("://")[0];
 
