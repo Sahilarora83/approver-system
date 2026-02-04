@@ -33,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       store: pool
         ? new PostgresStore({
           pool,
-          tableName: "sessions",
+          tableName: "session",
           createTableIfMissing: true,
         })
         : new FileStore({
