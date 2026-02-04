@@ -29,15 +29,19 @@ export function getApiUrl(): string {
 export function resolveImageUrl(path: string | null | undefined): string {
   if (!path) return "";
 
-  // If it's already a full URL or a local file/data URI, return as-is (with localhost fix if needed)
+  // If it's already a full URL or a local file/data URI, return as-is
   if (path.startsWith("http") || path.startsWith("file://") || path.startsWith("data:") || path.startsWith("content://")) {
     if (path.startsWith("http")) {
+      // If it is a Supabase URL or any other external URL, return it directly.
+      if (!path.includes("localhost") && !path.includes("127.0.0.1") && !path.includes("192.168.")) {
+        return path;
+      }
+
       const baseUrl = getApiUrl();
-      // Get the current hostname (e.g. "horizontal-nedda-technocompany-d67bfb10.koyeb.app")
       const currentHost = baseUrl.split("://")[1];
       const protocol = baseUrl.split("://")[0];
 
-      // If it contains a local IP or localhost, replace both the host and protocol
+      // Fix localhost URLs only if we are in production but the DB has local URLs
       if (/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/.test(path)) {
         return path.replace(/https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/g, `${protocol}://${currentHost}`);
       }
@@ -149,7 +153,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 5000, // 5 seconds default stale time
+      staleTime: 300000, // 5 minutes (prevents constant refetching)
       retry: false,
     },
     mutations: {
