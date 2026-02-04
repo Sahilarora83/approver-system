@@ -22,6 +22,37 @@ export default function TicketViewScreen({ route }: any) {
     queryKey: ["/api/registrations", registrationId],
   });
 
+  const safeFormatDate = (date: any) => {
+    try {
+      if (!date) return "Date TBD";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "Date TBD";
+      return d.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch (e) {
+      return "Date TBD";
+    }
+  };
+
+  const safeFormatTime = (date: any) => {
+    try {
+      if (!date) return "";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (e) {
+      return "";
+    }
+  };
+
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       weekday: "long",
@@ -141,13 +172,14 @@ export default function TicketViewScreen({ route }: any) {
                   Date & Time
                 </ThemedText>
                 <ThemedText type="body" style={styles.detailValue}>
-                  {ticket.event?.startDate ? formatDate(ticket.event.startDate) : "Date TBD"}
+                  {safeFormatDate(ticket.event?.startDate)}
                 </ThemedText>
                 {ticket.event?.startDate ? (
                   <ThemedText type="small" style={styles.timeText}>
-                    {formatTime(ticket.event.startDate)}
+                    {safeFormatTime(ticket.event.startDate)}
                   </ThemedText>
                 ) : null}
+
               </View>
             </View>
 

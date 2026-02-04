@@ -49,6 +49,24 @@ export default function MyTicketsScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation, refetch]);
 
+  const safeFormat = (date: any, formatStr: string) => {
+    try {
+      if (!date) return "TBD";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "TBD";
+      // Using native toLocaleDateString as a fallback or if date-fns fails
+      return d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch (e) {
+      return "TBD";
+    }
+  };
+
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       weekday: "short",
@@ -101,8 +119,9 @@ export default function MyTicketsScreen({ navigation }: any) {
         <TicketCard
           eventTitle={item.event?.title || "Event"}
           participantName={item.name}
-          date={item.event?.startDate ? formatDate(item.event.startDate) : "Date TBD"}
+          date={safeFormat(item.event?.startDate, "")}
           location={item.event?.location || "Location TBD"}
+
           qrCode={item.qrCode}
           status={item.status}
           showQR={false}
