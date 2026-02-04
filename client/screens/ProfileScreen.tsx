@@ -12,6 +12,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { navigationRef } from "@/App";
 
 const { width } = Dimensions.get("window");
 
@@ -82,12 +83,22 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleLogout = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    if (user) {
-      await logout();
+    await logout();
+
+    // Ensure we reset the navigation stack securely
+    if (navigationRef.isReady()) {
+      navigationRef.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
     } else {
-      navigation.navigate("Login");
+      // Fallback if not ready immediately (rare case)
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
     }
-  }, [logout, user, navigation]);
+  }, [logout, navigation]);
 
   const getRoleLabel = (role: string) => {
     switch (role) {
