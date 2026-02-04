@@ -3,7 +3,8 @@ import { StyleSheet, View, ScrollView, Image, Pressable, Linking, Dimensions, Pl
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, resolveImageUrl } from "@/lib/query-client";
+
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns";
@@ -45,6 +46,19 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     } catch (e) {
         tabBarHeight = 0;
     }
+
+    const safeFormat = (date: any, formatStr: string) => {
+        try {
+            if (!date) return "TBD";
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return "TBD";
+            return format(d, formatStr);
+        } catch (e) {
+            return "TBD";
+        }
+    };
+
+
 
     const { data: event, isLoading, refetch: refetchEvent } = useQuery({
         queryKey: [`/api/events/${eventId}`],
@@ -257,7 +271,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 {/* Header Image */}
                 <View style={styles.imageContainer}>
                     {event.coverImage ? (
-                        <Image source={{ uri: event.coverImage }} style={styles.headerImage} resizeMode="cover" />
+                        <Image source={{ uri: resolveImageUrl(event.coverImage) }} style={styles.headerImage} resizeMode="cover" />
                     ) : (
                         <LinearGradient colors={['#4c669f', '#3b5998', '#192f6a']} style={styles.headerImage}>
                             <Feather name="calendar" size={60} color="rgba(255,255,255,0.3)" />
@@ -293,9 +307,12 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 <Feather name="calendar" size={16} color={COLORS.textSecondary} />
                             </View>
                             <View>
-                                <ThemedText style={styles.metaMainText}>{format(new Date(event.startDate), "EEEE, d MMMM")}</ThemedText>
-                                <ThemedText style={styles.metaSubText}>{format(new Date(event.startDate), "h:mm a")} - {event.endDate ? format(new Date(event.endDate), "h:mm a") : "Late"}</ThemedText>
+                                <ThemedText style={styles.metaMainText}>{safeFormat(event.startDate, "EEEE, d MMMM")}</ThemedText>
+                                <ThemedText style={styles.metaSubText}>
+                                    {safeFormat(event.startDate, "h:mm a")} - {event.endDate ? safeFormat(event.endDate, "h:mm a") : "Late"}
+                                </ThemedText>
                             </View>
+
                         </View>
                     </View>
 
@@ -430,7 +447,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 <View key={index} style={styles.hostRowSmall}>
                                     <View style={[styles.hostAvatarSmall, { overflow: 'hidden' }]}>
                                         {index === 0 && event.organizerProfileImage ? (
-                                            <Image source={{ uri: event.organizerProfileImage }} style={styles.hostAvatarImageSmall} />
+                                            <Image source={{ uri: resolveImageUrl(event.organizerProfileImage) }} style={styles.hostAvatarImageSmall} />
                                         ) : (
                                             <ThemedText style={styles.hostInitialSmall}>{host.name?.[0]?.toUpperCase() || '?'}</ThemedText>
                                         )}
@@ -531,7 +548,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                     ]}
                                 >
                                     {reg.profileImage ? (
-                                        <Image source={{ uri: reg.profileImage }} style={{ width: '100%', height: '100%' }} />
+                                        <Image source={{ uri: resolveImageUrl(reg.profileImage) }} style={{ width: '100%', height: '100%' }} />
                                     ) : (
                                         <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
                                             {reg.name?.[0]?.toUpperCase() || '?'}

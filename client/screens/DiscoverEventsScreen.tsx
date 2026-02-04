@@ -12,6 +12,8 @@ import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { format } from "date-fns";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { resolveImageUrl } from "@/lib/query-client";
+
 
 export default function DiscoverEventsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
@@ -32,12 +34,23 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         }, [refetch])
     );
 
+    const safeFormat = (date: any, formatStr: string) => {
+        try {
+            if (!date) return "TBD";
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return "TBD";
+            return format(d, formatStr);
+        } catch (e) {
+            return "TBD";
+        }
+    };
+
     const categories = ["All", "Tech", "Design", "Music", "Business", "Social"];
 
     const filteredEvents = events.filter((event: any) => {
+        if (!event || !event.title) return false;
         const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (event.description && event.description.toLowerCase().includes(searchQuery.toLowerCase()));
-        // Mock category filtering since we don't have categories in DB yet
         return matchesSearch;
     });
 
@@ -57,7 +70,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
             <View style={styles.cardImageContainer}>
                 {event.coverImage ? (
                     <Image
-                        source={{ uri: event.coverImage }}
+                        source={{ uri: resolveImageUrl(event.coverImage) }}
                         style={styles.cardImage}
                         resizeMode="cover"
                     />
@@ -71,8 +84,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 )}
 
                 <View style={styles.dateBadge}>
-                    <ThemedText style={styles.dateMonth}>{format(new Date(event.startDate), "MMM")}</ThemedText>
-                    <ThemedText style={styles.dateDay}>{format(new Date(event.startDate), "d")}</ThemedText>
+                    <ThemedText style={styles.dateMonth}>{safeFormat(event.startDate, "MMM")}</ThemedText>
+                    <ThemedText style={styles.dateDay}>{safeFormat(event.startDate, "d")}</ThemedText>
                 </View>
             </View>
 
@@ -89,9 +102,10 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 <View style={styles.metaRow}>
                     <Feather name="clock" size={14} color={theme.textSecondary} />
                     <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                        {format(new Date(event.startDate), "h:mm a")}
+                        {safeFormat(event.startDate, "h:mm a")}
                     </ThemedText>
                 </View>
+
 
                 {/* Tags / Host info placeholder */}
                 <View style={styles.tagsContainer}>
@@ -177,7 +191,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
             <FlatList
                 data={filteredEvents}
                 renderItem={renderEventCard}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item?.id || Math.random().toString()}
+
                 contentContainerStyle={[styles.listContent, { paddingBottom: tabBarHeight + Spacing.xl }]}
                 showsVerticalScrollIndicator={false}
                 initialNumToRender={5}
