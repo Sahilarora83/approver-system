@@ -517,7 +517,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventId = String(req.params.id);
       const event = await storage.getEvent(eventId);
       if (!event) return res.status(404).json({ message: "Event not found" });
-      if (event.organizerId !== req.session.userId) return res.status(403).json({ message: "Unauthorized" });
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[UpdateEvent] Attempt by user: ${req.session.userId} to update event owned by: ${event.organizerId}`);
+      }
+
+      if (event.organizerId !== req.session.userId) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[UpdateEvent] Unauthorized: OrganizerId ${event.organizerId} !== SessionUser ${req.session.userId}`);
+        }
+        return res.status(403).json({ message: "Unauthorized" });
+      }
 
       // Parse formFields and socialLinks if they're strings
       let parsedFormFields = formFields;
