@@ -12,13 +12,17 @@ declare module "express-session" {
 }
 
 import sessionFileStore from "session-file-store";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
+import { supabase } from "./supabase";
 
 const FileStore = sessionFileStore(session);
+const PostgresStore = connectPgSimple(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Global Request Logger for Debugging
+  // Global Request Logger for Debugging (Suppressed in prod)
   app.use((req, res, next) => {
-    if (!req.url.startsWith('/static')) { // Ignore static assets
+    if (process.env.NODE_ENV !== 'production' && !req.url.startsWith('/static')) {
       console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
     }
     next();
@@ -26,12 +30,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(
     session({
-      store: new FileStore({
-        path: path.join(process.cwd(), ".sessions"),
-        ttl: 86400, // 1 day
-        reapInterval: 3600,
-        retries: 0,
-      }),
+      store: pool
+        ? new PostgresStore({
+          pool,
+          tableName: "sessions",
+          createTableIfMissing: true,
+        })
+        : new FileStore({
+          path: path.join(process.cwd(), ".sessions"),
+          ttl: 86400,
+          reapInterval: 3600,
+          retries: 0,
+        }),
       secret: process.env.SESSION_SECRET || "qr-ticket-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
@@ -54,15 +64,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // FALLBACK: Use X-User-Id header as a primary identifier for mobile apps
     const xUserId = req.headers['x-user-id'] || req.headers['X-User-Id'];
 
-    console.log(`[DEBUG AUTH] ${req.method} ${req.url} | SessionID: ${req.sessionID} | SessionUser: ${req.session?.userId} | HeaderUser: ${xUserId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEBUG AUTH] ${req.method} ${req.url} | SessionID: ${req.sessionID} | SessionUser: ${req.session?.userId} | HeaderUser: ${xUserId}`);
+    }
 
     if (xUserId && !req.session?.userId) {
       req.session.userId = String(xUserId);
-      console.log(`[DEBUG AUTH] Hydrated session from Header: ${xUserId}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEBUG AUTH] Hydrated session from Header: ${xUserId}`);
+      }
     }
 
     if (!req.session || !req.session.userId) {
-      console.log(`[DEBUG AUTH] 401 REJECTED for ${req.url}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEBUG AUTH] 401 REJECTED for ${req.url}`);
+      }
       return res.status(401).json({ message: "Unauthorized" });
     }
     next();
@@ -146,21 +162,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
+      const contentType = image.match(/^data:(image\/\w+);base64,/)?.[1] || "image/jpeg";
 
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      const filePath = path.join(process.cwd(), "uploads", fileName);
 
-      if (!fs.existsSync(path.join(process.cwd(), "uploads"))) {
-        await fs.promises.mkdir(path.join(process.cwd(), "uploads"));
+      // Upload to Supabase Storage "images" bucket
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(fileName, buffer, {
+          contentType,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error("Supabase Storage Error:", error);
+        return res.status(500).json({ message: "Upload to Supabase failed" });
       }
 
-      await fs.promises.writeFile(filePath, buffer);
+      // Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
 
-      // SIMPLIFIED: Return relative path. Client prepends its known API base URL.
-      // This fixes issues where server IP vs phone IP mismatch.
-      const fileUrl = `/uploads/${fileName}`;
-
-      res.json({ url: fileUrl });
+      res.json({ url: publicUrl });
     } catch (error) {
       console.error("Upload error:", error);
       res.status(500).json({ message: "Upload failed" });
@@ -394,7 +419,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventId = String(req.params.id);
       const emailParam = req.query.email as string | undefined;
 
-      console.log(`[StatusAPI] Checking status for Event: ${eventId}, Email param: ${emailParam}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[StatusAPI] Checking status for Event: ${eventId}, Email param: ${emailParam}`);
+      }
 
       // Check if user is authenticated
       const userId = req.session.userId;
@@ -403,29 +430,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (userId) {
         // User is logged in - check by userId first, then email
-        console.log(`[StatusAPI] User logged in: ${userId}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[StatusAPI] User logged in: ${userId}`);
+        }
         const user = await storage.getUser(userId);
         if (user) {
-          console.log(`[StatusAPI] User email: ${user.email}`);
           registration = await storage.getRegistrationForUserEvent(userId, eventId);
-          console.log(`[StatusAPI] Registration by userId:`, registration ? registration.id : 'not found');
 
           if (!registration) {
             const normalizedEmail = user.email.toLowerCase().trim();
-            console.log(`[StatusAPI] Checking by email: ${normalizedEmail}`);
             registration = await storage.getRegistrationByEmailForEvent(normalizedEmail, eventId);
-            console.log(`[StatusAPI] Registration by email:`, registration ? registration.id : 'not found');
           }
         }
       } else if (emailParam) {
         // User not logged in but provided email - check by email only
         const normalizedEmail = emailParam.toLowerCase().trim();
-        console.log(`[StatusAPI] Not logged in, checking by email param: ${normalizedEmail}`);
         registration = await storage.getRegistrationByEmailForEvent(normalizedEmail, eventId);
-        console.log(`[StatusAPI] Registration by email param:`, registration ? registration.id : 'not found');
       }
 
-      console.log(`[StatusAPI] Final registration:`, registration ? { id: registration.id, status: registration.status } : null);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[StatusAPI] Final registration:`, registration ? { id: registration.id, status: registration.status } : null);
+      }
       res.json({ registration: registration ? { ...registration } : null });
     } catch (error) {
       console.error("Registration status error:", error);

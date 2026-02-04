@@ -605,7 +605,9 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createBroadcast(data: { eventId: string; organizerId: string; title?: string; message: string }): Promise<void> {
-    console.log(`[Storage] Creating broadcast for event ${data.eventId} by ${data.organizerId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Storage] Creating broadcast for event ${data.eventId} by ${data.organizerId}`);
+    }
     const { error } = await supabase
       .from('broadcasts')
       .insert(toSnakeCase(data));
@@ -614,11 +616,16 @@ export class SupabaseStorage implements IStorage {
       console.error(`[Storage Error] Broadcast Insert failed: ${error.message}`);
       throw new Error(error.message);
     }
-    console.log(`[Storage] Broadcast stored successfully`);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Storage] Broadcast stored successfully`);
+    }
   }
 
   async linkRegistrationsToUser(email: string, userId: string): Promise<void> {
-    console.log(`[Storage] Linking guest registrations for ${email} to user ${userId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Storage] Linking guest registrations for ${email} to user ${userId}`);
+    }
     const { error } = await supabase
       .from('registrations')
       .update({ user_id: userId })
@@ -627,7 +634,7 @@ export class SupabaseStorage implements IStorage {
 
     if (error) {
       console.error(`[Storage Error] Failed to link registrations: ${error.message}`);
-    } else {
+    } else if (process.env.NODE_ENV !== 'production') {
       console.log(`[Storage] Successfully linked registrations for ${email}`);
     }
   }

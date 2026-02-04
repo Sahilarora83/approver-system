@@ -74,17 +74,18 @@ function setupRequestLogging(app: express.Application) {
     };
 
     res.on("finish", () => {
-      if (!path.startsWith("/api")) return;
-
       const duration = Date.now() - start;
+      const status = res.statusCode;
 
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      // Skip logging successful static asset requests to keep logs clean
+      if (status < 400 && (path.startsWith("/assets") || path.startsWith("/static") || path === "/health")) {
+        return;
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      let logLine = `${req.method} ${path} ${status} in ${duration}ms`;
+      if (capturedJsonResponse && path.startsWith("/api")) {
+        const responseSnippet = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${responseSnippet.length > 100 ? responseSnippet.slice(0, 97) + "..." : responseSnippet}`;
       }
 
       log(logLine);
@@ -227,6 +228,11 @@ function setupErrorHandler(app: express.Application) {
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
+
+  // Health check endpoint for Railway/Koyeb
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   configureExpoAndLanding(app);
 
