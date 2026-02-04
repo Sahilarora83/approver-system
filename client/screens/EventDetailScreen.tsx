@@ -234,20 +234,21 @@ export default function EventDetailScreen({ route, navigation }: any) {
         <ThemedText type="small" style={{ opacity: 0.7, marginBottom: Spacing.sm, textTransform: 'uppercase' }}>Hosted By</ThemedText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
           {(() => {
+            const hasSocialLinks = event?.socialLinks && typeof event.socialLinks === 'object' && Object.keys(event.socialLinks).length > 0;
             const hostsData = Array.isArray(event?.socialLinks)
               ? event.socialLinks
               : (event?.hostedBy || "Organizer").split(',').map((name: string) => ({
                 name: name.trim(),
-                instagram: event?.socialLinks?.instagram,
-                twitter: event?.socialLinks?.twitter,
-                linkedin: event?.socialLinks?.linkedin
+                instagram: hasSocialLinks ? event?.socialLinks?.instagram : undefined,
+                twitter: hasSocialLinks ? event?.socialLinks?.twitter : undefined,
+                linkedin: hasSocialLinks ? event?.socialLinks?.linkedin : undefined
               }));
             return hostsData.map((host: any, index: number) => (
               <View key={index} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.backgroundSecondary, paddingRight: 8, borderRadius: BorderRadius.full, paddingVertical: 4, paddingLeft: 4 }}>
                 <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                  <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{host.name?.[0]?.toUpperCase()}</ThemedText>
+                  <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{(host.name || 'O')?.[0]?.toUpperCase()}</ThemedText>
                 </View>
-                <ThemedText type="small" style={{ fontWeight: '600', marginRight: 8 }}>{host.name}</ThemedText>
+                <ThemedText type="small" style={{ fontWeight: '600', marginRight: 8 }}>{host.name || 'Organizer'}</ThemedText>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   {host.instagram ? <Pressable onPress={() => Linking.openURL(host.instagram)}><Feather name="instagram" size={12} color={theme.textSecondary} /></Pressable> : null}
                   {host.twitter ? <Pressable onPress={() => Linking.openURL(host.twitter)}><Feather name="twitter" size={12} color={theme.textSecondary} /></Pressable> : null}
