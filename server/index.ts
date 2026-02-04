@@ -268,7 +268,7 @@ function setupErrorHandler(app: express.Application) {
     }
 
     // Load and customize Luma-style template
-    const templatePath = path.resolve(__dirname, "..", "server", "templates", "register.html");
+    const templatePath = path.resolve(process.cwd(), "server", "templates", "register.html");
     let html = fs.readFileSync(templatePath, "utf-8");
 
     const formattedDate = new Date(event.startDate).toLocaleDateString('en-US', {
