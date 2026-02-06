@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Modal, Alert } from "react-native";
+import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Modal, Alert, Share } from "react-native";
 import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -125,6 +125,22 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         scrollY.value = event.contentOffset.y;
     });
 
+    const handleShare = async () => {
+        try {
+            const publicLink = event.publicLink || event.public_link;
+            const url = `https://qr-ticket-manager.expo.app/events/${publicLink}`;
+            const message = `Check out this event: ${event.title}\n\nRegister here: ${url}`;
+
+            await Share.share({
+                message,
+                url, // iOS only
+                title: event.title,
+            });
+        } catch (error) {
+            console.error("Share error:", error);
+        }
+    };
+
     const handleRegister = () => {
         if (!event) return;
         if (isApproved) {
@@ -170,7 +186,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     <View style={styles.headerRow}>
                         <ThemedText style={styles.title}>{event.title}</ThemedText>
                         <View style={styles.headerActions}>
-                            <Pressable style={styles.actionIcon} onPress={() => setShowShareModal(true)}>
+                            <Pressable style={styles.actionIcon} onPress={handleShare}>
                                 <Feather name="share-2" size={20} color="#FFF" />
                             </Pressable>
                             <Pressable style={[styles.actionIcon, { marginLeft: 12 }]}>
