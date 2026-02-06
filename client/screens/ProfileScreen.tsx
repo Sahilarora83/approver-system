@@ -60,20 +60,20 @@ export default function ProfileScreen({ navigation }: any) {
   const { theme } = useTheme();
   const { user, logout, refreshUser } = useAuth();
 
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading: isStatsLoading } = useQuery({
     queryKey: ["userStats", user?.id],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/stats");
       return res.json();
     },
     enabled: !!user,
-    staleTime: 60000, // Cache for 1 minute to reduce API load
+    staleTime: 30000, // Reduced staleTime for better sync while keeping cache benefits
   });
 
-  // Refresh user data when screen comes into focus
+  // Background refresh when screen comes into focus without blocking UI
   useFocusEffect(
     useCallback(() => {
-      refreshUser();
+      if (user) refreshUser();
     }, [refreshUser])
   );
 

@@ -34,7 +34,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
-    const [userCity, setUserCity] = useState("California, USA");
+    const [userCity, setUserCity] = useState("Detecting location...");
+    const [isLocationLoading, setIsLocationLoading] = useState(true);
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
@@ -60,6 +61,9 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 }
             } catch (error) {
                 console.error("Location error", error);
+                setUserCity("Location unavailable");
+            } finally {
+                setIsLocationLoading(false);
             }
         })();
     }, []);
@@ -178,7 +182,11 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                             <Feather name="compass" size={14} color="rgba(255,255,255,0.8)" />
                             <ThemedText style={styles.locationLabel}>Events near me</ThemedText>
                         </View>
-                        <ThemedText style={styles.locationTitle}>{userCity}</ThemedText>
+                        {isLocationLoading ? (
+                            <View style={styles.locationSkeleton} />
+                        ) : (
+                            <ThemedText style={styles.locationTitle}>{userCity}</ThemedText>
+                        )}
                     </View>
                     <Pressable
                         onPress={() => navigation.navigate("Notifications")}
@@ -338,6 +346,13 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: "800",
         color: "#FFF",
+        marginTop: 4,
+    },
+    locationSkeleton: {
+        width: 140,
+        height: 28,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        borderRadius: 8,
         marginTop: 4,
     },
     notifButton: {
