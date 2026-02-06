@@ -61,9 +61,7 @@
       }
     },
     "owner": "sahil8810",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/f46465b7-06f4-4c2c-b4f0-79cbf3f5957d"
     }
