@@ -276,6 +276,8 @@ export class SupabaseStorage implements IStorage {
         form_fields: eventData.formFields,
         public_link: publicLink,
         cover_image: eventData.coverImage,
+        gallery: eventData.gallery,
+        price_packages: eventData.pricePackages,
         hosted_by: eventData.hostedBy,
         social_links: eventData.socialLinks || {},
       })

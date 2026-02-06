@@ -1,30 +1,38 @@
-import React from "react";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useMemo } from "react";
+import { StyleSheet, View, FlatList, Pressable, ScrollView, Dimensions, Modal, ActivityIndicator } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Image } from "expo-image";
-import Animated, { FadeInRight } from "react-native-reanimated";
-import { apiRequest, resolveImageUrl } from "@/lib/query-client";
+import Animated, { FadeInDown, FadeInRight, SlideInDown, SlideOutDown, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+
+import { apiRequest, resolveImageUrl, queryClient } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Spacing, Shadows } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { View, Pressable, StyleSheet, FlatList, ActivityIndicator, ScrollView } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Spacing, Shadows, BorderRadius } from "@/constants/theme";
+
+const { width, height } = Dimensions.get("window");
 
 const CATEGORIES = [
-    { name: "All", icon: "all-inclusive" },
-    { name: "Music", icon: "music" },
-    { name: "Art", icon: "palette" },
-    { name: "Workshop", icon: "laptop" },
+    { name: "All", icon: "checkmark-circle" },
+    { name: "Music", icon: "musical-notes" },
+    { name: "Art", icon: "color-palette" },
+    { name: "Workshop", icon: "briefcase" },
 ];
 
 export default function FavoritesScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
-    const [selectedCategory, setSelectedCategory] = React.useState("All");
+    const [selectedCategory, setSelectedCategory] = useState("All");
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [removingItem, setRemovingItem] = useState<any>(null);
 
-    const { data: favorites, isLoading, refetch } = useQuery<any[]>({
+    const { data: favorites, isLoading } = useQuery<any[]>({
         queryKey: ["/api/favorites"],
         queryFn: async () => {
             const res = await apiRequest("GET", "/api/favorites");
@@ -33,7 +41,18 @@ export default function FavoritesScreen({ navigation }: any) {
         enabled: !!user,
     });
 
-    const filteredFavorites = React.useMemo(() => {
+    const removeMutation = useMutation({
+        mutationFn: async (id: string) => {
+            await apiRequest("DELETE", `/api/favorites/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+            setRemovingItem(null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+    });
+
+    const filteredFavorites = useMemo(() => {
         if (!favorites) return [];
         if (selectedCategory === "All") return favorites;
         return favorites.filter(f => f.event.category === selectedCategory);
@@ -42,45 +61,59 @@ export default function FavoritesScreen({ navigation }: any) {
     const renderHeader = () => (
         <View style={styles.header}>
             <View style={styles.headerTop}>
-                <ThemedText style={styles.title}>Favorites</ThemedText>
-                <View style={styles.headerActions}>
-                    <Pressable style={styles.iconButton}>
-                        <Feather name="search" size={22} color="#FFF" />
+                <View style={styles.headerLeft}>
+                    <View style={styles.logoContainer}>
+                        <LinearGradient
+                            colors={["#7C3AED", "#6D28D9"]}
+                            style={styles.logoGradient}
+                        >
+                            <ThemedText style={styles.logoText}>e</ThemedText>
+                        </LinearGradient>
+                    </View>
+                    <ThemedText style={styles.headerTitle}>Favorites</ThemedText>
+                </View>
+                <View style={styles.headerRight}>
+                    <Pressable style={styles.iconBtn}>
+                        <Ionicons name="search-outline" size={22} color="#FFF" />
                     </Pressable>
-                    <Pressable style={[styles.iconButton, { marginLeft: 12 }]}>
-                        <Feather name="sliders" size={22} color="#FFF" />
+                    <Pressable style={[styles.iconBtn, { marginLeft: 12 }]}>
+                        <Ionicons name="options-outline" size={22} color="#FFF" />
                     </Pressable>
                 </View>
             </View>
 
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipScroll}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
                 {CATEGORIES.map(cat => (
                     <Pressable
                         key={cat.name}
-                        onPress={() => setSelectedCategory(cat.name)}
-                        style={[styles.chip, selectedCategory === cat.name && styles.chipActive]}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            setSelectedCategory(cat.name);
+                        }}
+                        style={[
+                            styles.categoryChip,
+                            selectedCategory === cat.name && styles.categoryChipActive
+                        ]}
                     >
-                        <MaterialCommunityIcons
-                            name={cat.icon as any}
-                            size={18}
-                            color={selectedCategory === cat.name ? "#FFF" : "#9CA3AF"}
-                        />
-                        <ThemedText style={[styles.chipText, selectedCategory === cat.name && styles.chipTextActive]}>
-                            {cat.name}
-                        </ThemedText>
+                        {selectedCategory === cat.name && <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginRight: 4 }} />}
+                        {!(selectedCategory === cat.name) && <Ionicons name={cat.icon as any} size={16} color="#9CA3AF" style={{ marginRight: 4 }} />}
+                        <ThemedText style={[
+                            styles.categoryText,
+                            selectedCategory === cat.name && styles.categoryTextActive
+                        ]}>{cat.name}</ThemedText>
                     </Pressable>
                 ))}
             </ScrollView>
 
-            <View style={styles.countRow}>
-                <ThemedText style={styles.countText}>{filteredFavorites.length} favorites</ThemedText>
-                <View style={styles.viewToggles}>
-                    <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#374151" />
-                    <MaterialCommunityIcons name="view-grid" size={20} color="#7C3AED" style={{ marginLeft: 12 }} />
+            <View style={styles.resultsHeader}>
+                <ThemedText style={styles.resultsCount}>{filteredFavorites.length} favorites</ThemedText>
+                <View style={styles.viewToggle}>
+                    <Pressable onPress={() => setViewMode("list")}>
+                        <Ionicons name="list" size={22} color={viewMode === "list" ? "#7C3AED" : "#374151"} />
+                    </Pressable>
+                    <Pressable onPress={() => setViewMode("grid")} style={{ marginLeft: 16 }}>
+                        <Ionicons name="grid" size={22} color={viewMode === "grid" ? "#7C3AED" : "#374151"} />
+                    </Pressable>
                 </View>
             </View>
         </View>
@@ -88,7 +121,7 @@ export default function FavoritesScreen({ navigation }: any) {
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={styles.loadingWrapper}>
                 <ActivityIndicator size="large" color="#7C3AED" />
             </View>
         );
@@ -97,106 +130,158 @@ export default function FavoritesScreen({ navigation }: any) {
     return (
         <ThemedView style={styles.container}>
             <FlatList
+                key={viewMode}
                 data={filteredFavorites}
                 keyExtractor={(item) => item.id}
+                numColumns={viewMode === "grid" ? 2 : 1}
                 ListHeaderComponent={renderHeader}
-                numColumns={2}
-                columnWrapperStyle={styles.columnWrapper}
-                contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 20, paddingBottom: 100 }]}
+                contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 100 }}
                 renderItem={({ item, index }) => (
-                    <Animated.View entering={FadeInRight.delay(index * 50).duration(500)} style={styles.cardContainer}>
+                    <Animated.View
+                        entering={FadeInDown.delay(index * 50)}
+                        style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}
+                    >
                         <Pressable
-                            style={styles.card}
+                            style={viewMode === "grid" ? styles.gridCard : styles.listCard}
                             onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
                         >
-                            <View style={styles.cardImageContainer}>
-                                <Image
-                                    source={{ uri: resolveImageUrl(item.event.coverImage) }}
-                                    style={styles.cardImage}
-                                    contentFit="cover"
-                                />
-                                {(!item.event.price || item.event.price === "0" || item.event.price.toLowerCase() === "free") && (
-                                    <View style={styles.priceBadge}>
-                                        <ThemedText style={styles.priceText}>FREE</ThemedText>
-                                    </View>
-                                )}
-                            </View>
-                            <View style={styles.cardInfo}>
-                                <ThemedText style={styles.cardTitle} numberOfLines={1}>{item.event.title}</ThemedText>
-                                <ThemedText style={styles.cardTime}>
-                                    {(() => {
-                                        try {
-                                            return format(new Date(item.event.startDate), "EEE, MMM d · hh:mm a");
-                                        } catch { return "TBD"; }
-                                    })()}
+                            <Image
+                                source={{ uri: resolveImageUrl(item.event.coverImage) }}
+                                style={viewMode === "grid" ? styles.gridImage : styles.listImage}
+                            />
+                            {(!item.event.price || item.event.price === "0") && (
+                                <View style={styles.freeBadge}>
+                                    <ThemedText style={styles.freeText}>FREE</ThemedText>
+                                </View>
+                            )}
+                            <View style={viewMode === "grid" ? styles.gridInfo : styles.listInfo}>
+                                <ThemedText style={styles.eventTitle} numberOfLines={1}>{item.event.title}</ThemedText>
+                                <ThemedText style={styles.eventDate}>
+                                    {format(new Date(item.event.startDate), "EEE, MMM d · hh:mm a")}
                                 </ThemedText>
-                                <View style={styles.locRow}>
-                                    <View style={styles.locInfo}>
-                                        <Feather name="map-pin" size={12} color="#7C3AED" />
-                                        <ThemedText style={styles.locText} numberOfLines={1}>
-                                            {item.event.location || "Online"}
-                                        </ThemedText>
-                                    </View>
-                                    <Pressable style={styles.heartSmall}>
-                                        <MaterialCommunityIcons name="heart" size={16} color="#7C3AED" />
-                                    </Pressable>
+                                <View style={styles.locationContainer}>
+                                    <Ionicons name="location" size={12} color="#7C3AED" />
+                                    <ThemedText style={styles.locationText} numberOfLines={1}>
+                                        {item.event.location || "Online"}
+                                    </ThemedText>
                                 </View>
                             </View>
+                            <Pressable
+                                style={styles.heartBtn}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    setRemovingItem(item);
+                                }}
+                            >
+                                <Ionicons name="heart" size={20} color="#7C3AED" />
+                            </Pressable>
                         </Pressable>
                     </Animated.View>
                 )}
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
-                        <View style={styles.iconCircle}>
-                            <Feather name="heart" size={48} color="#7C3AED" />
-                        </View>
-                        <ThemedText style={styles.emptyTitle}>Your Heart's Picks</ThemedText>
-                        <ThemedText style={styles.emptySub}>Events you favorite will appear here so you never miss out on the action.</ThemedText>
-                        <Pressable style={styles.exploreButton} onPress={() => navigation.navigate("Explore")}>
-                            <ThemedText style={styles.exploreButtonText}>Discover Events</ThemedText>
-                        </Pressable>
+                        <Ionicons name="heart-outline" size={80} color="#374151" />
+                        <ThemedText style={styles.emptyTitle}>Nothing here yet</ThemedText>
+                        <ThemedText style={styles.emptySub}>Start searching for events now to build your favorites list.</ThemedText>
                     </View>
                 }
             />
+
+            {/* Remove Confirmation Modal */}
+            <Modal transparent visible={!!removingItem} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setRemovingItem(null)} />
+                    <Animated.View entering={SlideInDown} exiting={SlideOutDown} style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+                        <ThemedText style={styles.modalTitle}>Remove from Favorites?</ThemedText>
+
+                        {removingItem && (
+                            <View style={styles.previewCard}>
+                                <Image
+                                    source={{ uri: resolveImageUrl(removingItem.event.coverImage) }}
+                                    style={styles.previewImage}
+                                />
+                                <View style={styles.previewInfo}>
+                                    <ThemedText style={styles.previewTitle}>{removingItem.event.title}</ThemedText>
+                                    <ThemedText style={styles.previewDate}>
+                                        {format(new Date(removingItem.event.startDate), "EEE, MMM d · hh:mm a")}
+                                    </ThemedText>
+                                    <View style={styles.locationContainer}>
+                                        <Ionicons name="location" size={12} color="#7C3AED" />
+                                        <ThemedText style={styles.locationText}>{removingItem.event.location}</ThemedText>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.modalButtons}>
+                            <Pressable style={styles.cancelBtn} onPress={() => setRemovingItem(null)}>
+                                <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+                            </Pressable>
+                            <Pressable
+                                style={styles.confirmBtn}
+                                onPress={() => removeMutation.mutate(removingItem.id)}
+                            >
+                                <ThemedText style={styles.confirmBtnText}>Yes, Remove</ThemedText>
+                            </Pressable>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
         </ThemedView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#111827" },
-    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#111827" },
-    header: { paddingHorizontal: 24, marginBottom: 20 },
-    headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
-    headerActions: { flexDirection: "row", alignItems: "center" },
-    title: { fontSize: 32, fontWeight: "900", color: "#FFF", letterSpacing: -0.5 },
-    iconButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-    chipScroll: { gap: 10, marginBottom: 24 },
-    chip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", gap: 8 },
-    chipActive: { backgroundColor: "#7C3AED", borderColor: "#7C3AED" },
-    chipText: { color: "#9CA3AF", fontSize: 14, fontWeight: "700" },
-    chipTextActive: { color: "#FFF" },
-    countRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    countText: { fontSize: 18, fontWeight: "800", color: "#FFF" },
-    viewToggles: { flexDirection: "row", alignItems: "center" },
-    listContent: { paddingHorizontal: 18 },
-    columnWrapper: { justifyContent: "space-between" },
-    cardContainer: { width: "48%", marginBottom: 20 },
-    card: { backgroundColor: "#1F2937", borderRadius: 24, overflow: "hidden", ...Shadows.md },
-    cardImageContainer: { width: "100%", height: 140 },
-    cardImage: { width: "100%", height: "100%" },
-    priceBadge: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(124, 58, 237, 0.9)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    priceText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
-    cardInfo: { padding: 12, gap: 4 },
-    cardTitle: { fontSize: 15, fontWeight: "800", color: "#FFF" },
-    cardTime: { fontSize: 12, color: "#7C3AED", fontWeight: "700" },
-    locRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
-    locInfo: { flexDirection: "row", alignItems: "center", gap: 4, flex: 1 },
-    locText: { flex: 1, fontSize: 11, color: "#9CA3AF", fontWeight: "500" },
-    heartSmall: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center" },
-    emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 80, paddingHorizontal: 40 },
-    iconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center", marginBottom: 24 },
-    emptyTitle: { fontSize: 24, fontWeight: "900", color: "#FFF", textAlign: "center" },
-    emptySub: { fontSize: 15, color: "#9CA3AF", textAlign: "center", marginTop: 12, lineHeight: 22 },
-    exploreButton: { marginTop: 40, backgroundColor: "#7C3AED", paddingHorizontal: 32, paddingVertical: 16, borderRadius: 30, ...Shadows.lg },
-    exploreButtonText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
+    loadingWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+    header: { paddingHorizontal: 20 },
+    headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+    headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+    logoContainer: { width: 36, height: 36, borderRadius: 10, overflow: "hidden" },
+    logoGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
+    logoText: { color: "#FFF", fontSize: 20, fontWeight: "900", fontStyle: "italic" },
+    headerTitle: { fontSize: 24, fontWeight: "900", color: "#FFF" },
+    headerRight: { flexDirection: "row", alignItems: "center" },
+    iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.05)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+    categoryScroll: { gap: 8, marginBottom: 20 },
+    categoryChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", backgroundColor: "rgba(255,255,255,0.02)" },
+    categoryChipActive: { backgroundColor: "#7C3AED", borderColor: "#7C3AED" },
+    categoryText: { color: "#9CA3AF", fontSize: 14, fontWeight: "700" },
+    categoryTextActive: { color: "#FFF" },
+    resultsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+    resultsCount: { fontSize: 16, fontWeight: "800", color: "#FFF" },
+    viewToggle: { flexDirection: "row", alignItems: "center" },
+    gridItemWrapper: { width: (width - 60) / 2, marginLeft: 20, marginBottom: 20 },
+    listItemWrapper: { paddingHorizontal: 20, marginBottom: 16 },
+    gridCard: { backgroundColor: "#1F2937", borderRadius: 24, overflow: "hidden", ...Shadows.md },
+    listCard: { backgroundColor: "#1F2937", borderRadius: 24, overflow: "hidden", flexDirection: "row", padding: 12, alignItems: "center", ...Shadows.md },
+    gridImage: { width: "100%", height: 160 },
+    listImage: { width: 100, height: 100, borderRadius: 20 },
+    freeBadge: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(124, 58, 237, 0.9)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    freeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
+    gridInfo: { padding: 12, gap: 4 },
+    listInfo: { flex: 1, marginLeft: 16, gap: 4 },
+    eventTitle: { fontSize: 16, fontWeight: "800", color: "#FFF" },
+    eventDate: { fontSize: 12, color: "#7C3AED", fontWeight: "700" },
+    locationContainer: { flexDirection: "row", alignItems: "center", gap: 4 },
+    locationText: { fontSize: 12, color: "#9CA3AF", fontWeight: "500", flex: 1 },
+    heartBtn: { position: "absolute", bottom: 12, right: 12 },
+    emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 100, paddingHorizontal: 40 },
+    emptyTitle: { fontSize: 20, fontWeight: "900", color: "#FFF", marginTop: 20 },
+    emptySub: { fontSize: 14, color: "#9CA3AF", textAlign: "center", marginTop: 8, lineHeight: 20 },
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
+    modalContent: { backgroundColor: "#1F2937", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.1)", alignSelf: "center", marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: "900", color: "#FFF", textAlign: "center", marginBottom: 24 },
+    previewCard: { backgroundColor: "#111827", borderRadius: 24, padding: 12, flexDirection: "row", alignItems: "center", marginBottom: 32 },
+    previewImage: { width: 80, height: 80, borderRadius: 16 },
+    previewInfo: { flex: 1, marginLeft: 16, gap: 4 },
+    previewTitle: { fontSize: 15, fontWeight: "800", color: "#FFF" },
+    previewDate: { fontSize: 12, color: "#7C3AED", fontWeight: "700" },
+    modalButtons: { flexDirection: "row", gap: 12 },
+    cancelBtn: { flex: 1, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.05)", justifyContent: "center", alignItems: "center" },
+    cancelBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+    confirmBtn: { flex: 1, height: 56, borderRadius: 28, backgroundColor: "#4F46E5", justifyContent: "center", alignItems: "center" },
+    confirmBtnText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
 });

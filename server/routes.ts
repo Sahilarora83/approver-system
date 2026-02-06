@@ -779,12 +779,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const {
         title, description, location, address, latitude, longitude, category, price,
-        startDate, endDate, requiresApproval, checkInEnabled, formFields, coverImage, hostedBy, socialLinks
+        startDate, endDate, requiresApproval, checkInEnabled, formFields, coverImage, hostedBy, socialLinks,
+        gallery, pricePackages
       } = req.body;
       if (!title || !startDate) return res.status(400).json({ message: "Title and start date are required" });
 
       let parsedFormFields = formFields;
       let parsedSocialLinks = socialLinks;
+      let parsedGallery = gallery;
+      let parsedPricePackages = pricePackages;
 
       if (typeof formFields === 'string') {
         try {
@@ -804,6 +807,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (typeof gallery === 'string') {
+        try {
+          parsedGallery = JSON.parse(gallery);
+        } catch (e) {
+          console.error('[CreateEvent] Failed to parse gallery:', e);
+          return res.status(400).json({ message: "Invalid gallery format" });
+        }
+      }
+
+      if (typeof pricePackages === 'string') {
+        try {
+          parsedPricePackages = JSON.parse(pricePackages);
+        } catch (e) {
+          console.error('[CreateEvent] Failed to parse pricePackages:', e);
+          return res.status(400).json({ message: "Invalid pricePackages format" });
+        }
+      }
+
       const event = await storage.createEvent({
         organizerId: req.session.userId!,
         title,
@@ -814,12 +835,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude: latitude || null,
         longitude: longitude || null,
         price: price || "0",
+        pricePackages: parsedPricePackages || [],
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         requiresApproval: requiresApproval || false,
         checkInEnabled: checkInEnabled !== false,
         formFields: parsedFormFields || [],
         coverImage: coverImage || null,
+        gallery: parsedGallery || [],
         hostedBy: hostedBy || null,
         socialLinks: parsedSocialLinks || {},
       });
