@@ -1,26 +1,22 @@
-import React, { useState, useCallback } from "react";
-import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform } from "react-native";
+import React, { useState, useCallback, useMemo } from "react";
+import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
-
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { format } from "date-fns";
-import { useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { resolveImageUrl } from "@/lib/query-client";
-import Animated, { FadeInDown, FadeInUp, Layout } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeInRight, Layout } from "react-native-reanimated";
 import { Icon } from "@/components/Icon";
 
-
-
-
+const { width } = Dimensions.get("window");
 
 export default function DiscoverEventsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
@@ -28,13 +24,11 @@ export default function DiscoverEventsScreen({ navigation }: any) {
     const tabBarHeight = useBottomTabBarHeight();
 
     const [searchQuery, setSearchQuery] = useState("");
-
+    const [selectedCategory, setSelectedCategory] = useState("All");
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
-        // Using global staleTime of 5 minutes for better performance
     }) as { data: any[]; isLoading: boolean; refetch: any; isFetching: boolean };
-
 
     const safeFormat = (date: any, formatStr: string) => {
         try {
@@ -47,222 +41,232 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         }
     };
 
-    const categories = ["All", "Tech", "Design", "Music", "Business", "Social"];
-    const [selectedCategory, setSelectedCategory] = useState("All");
+    const categories = [
+        { name: "All", icon: "grid" },
+        { name: "Music", icon: "music" },
+        { name: "Tech", icon: "cpu" },
+        { name: "Concert", icon: "mic" },
+        { name: "Design", icon: "layers" },
+        { name: "Social", icon: "users" },
+    ];
 
-    const filteredEvents = events.filter((event: any) => {
-        if (!event || !event.title) return false;
-        const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (event.description && event.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredEvents = useMemo(() => {
+        return events.filter((event: any) => {
+            if (!event || !event.title) return false;
+            const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (event.description && event.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        if (selectedCategory !== "All") {
-            // Match category if description or title contains it
-            const matchesCategory = (event.description && event.description.toLowerCase().includes(selectedCategory.toLowerCase())) ||
-                event.title.toLowerCase().includes(selectedCategory.toLowerCase());
-            return matchesSearch && matchesCategory;
-        }
-        return matchesSearch;
-    });
+            if (selectedCategory !== "All") {
+                const matchesCategory = (event.description && event.description.toLowerCase().includes(selectedCategory.toLowerCase())) ||
+                    event.title.toLowerCase().includes(selectedCategory.toLowerCase());
+                return matchesSearch && matchesCategory;
+            }
+            return matchesSearch;
+        });
+    }, [events, searchQuery, selectedCategory]);
 
-    const renderEventCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
-        <Animated.View entering={FadeInDown.delay(index * 50).duration(400).springify()}>
+    const upcomingEvents = useMemo(() => events.slice(0, 5), [events]);
+    const topPickEvents = useMemo(() => filteredEvents.slice(0, 10), [filteredEvents]);
+
+    const renderUpcomingCard = ({ item: event, index }: { item: any, index: number }) => (
+        <Animated.View entering={FadeInRight.delay(index * 100).duration(500)}>
             <Pressable
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
                 style={({ pressed }) => [
-                    styles.card,
-                    {
-                        backgroundColor: theme.backgroundDefault,
-                        transform: [{ scale: pressed ? 0.98 : 1 }]
-                    },
+                    styles.upcomingCard,
+                    { backgroundColor: theme.backgroundDefault, transform: [{ scale: pressed ? 0.96 : 1 }] },
                     Shadows.md
                 ]}
             >
-                {/* Event Image */}
-                <View style={styles.cardImageContainer}>
-                    {event.coverImage ? (
-                        <Image
-                            source={{ uri: resolveImageUrl(event.coverImage) }}
-                            style={styles.cardImage}
-                            contentFit="cover"
-                            transition={200}
-                        />
-
-                    ) : (
-                        <LinearGradient
-                            colors={[theme.primary, theme.primary + '80']}
-                            style={styles.cardImage}
-                        >
-                            <Feather name="calendar" size={48} color="rgba(255,255,255,0.3)" />
-                        </LinearGradient>
-                    )}
-
-                    <View style={[styles.dateBadge, { backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255,255,255,0.95)' }]}>
-                        <ThemedText style={styles.dateMonth}>{safeFormat(event.startDate, "MMM")}</ThemedText>
-                        <ThemedText style={styles.dateDay}>{safeFormat(event.startDate, "d")}</ThemedText>
-                    </View>
-
-                    {/* Badge */}
-                    <View style={[styles.imageTag, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-                        <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>TRENDING</ThemedText>
-                    </View>
-                </View>
-
-                <View style={styles.cardContent}>
-                    <ThemedText type="h3" numberOfLines={1} style={styles.cardTitle}>{event.title}</ThemedText>
-
-                    <View style={styles.metaContainer}>
-                        <View style={styles.metaRow}>
-                            <Icon name="map-pin" size={14} color={theme.primary} />
-                            <ThemedText type="small" numberOfLines={1} style={{ color: theme.textSecondary }}>
-                                {event.location || "Online Event"}
-                            </ThemedText>
-                        </View>
-
-                        <View style={styles.metaRow}>
-                            <Icon name="clock" size={14} color={theme.primary} />
-                            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                                {safeFormat(event.startDate, "h:mm a")}
-                            </ThemedText>
-                        </View>
-                    </View>
-
-                    <View style={styles.cardFooter}>
-                        <View style={styles.attendeesContainer}>
-                            <View style={[styles.attendeeCircle, { backgroundColor: theme.backgroundSecondary }]}>
-                                <Feather name="users" size={12} color={theme.textSecondary} />
-                            </View>
-                            <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6 }}>
-                                {event.registrationCount || 0} joining
-                            </ThemedText>
-                        </View>
-
-                        <View style={[styles.priceTag, { backgroundColor: theme.primary + '15' }]}>
-                            <ThemedText style={{ color: theme.primary, fontWeight: '800', fontSize: 11 }}>FREE</ThemedText>
-                        </View>
+                <Image
+                    source={{ uri: resolveImageUrl(event.coverImage) }}
+                    style={styles.upcomingImage}
+                    contentFit="cover"
+                />
+                <View style={styles.upcomingInfo}>
+                    <ThemedText style={styles.upcomingDate}>{safeFormat(event.startDate, "d MMM, yyyy")}</ThemedText>
+                    <ThemedText type="h4" numberOfLines={2} style={styles.upcomingTitle}>{event.title}</ThemedText>
+                    <View style={styles.upcomingLocation}>
+                        <Feather name="map-pin" size={12} color={theme.textSecondary} />
+                        <ThemedText style={styles.upcomingLocationText} numberOfLines={1}>{event.location || "California, USA"}</ThemedText>
                     </View>
                 </View>
             </Pressable>
         </Animated.View>
-    ), [theme, isDark, navigation]);
+    );
 
-
-    return (
-        <ThemedView style={styles.container}>
-            <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-                <View>
-                    <ThemedText type="h1">Discover</ThemedText>
-                    <ThemedText style={{ color: theme.textSecondary, opacity: 0.6, fontSize: 13 }}>
-                        Find amazing events locally
-                    </ThemedText>
+    const renderLargeCard = ({ item: event, index }: { item: any, index: number }) => (
+        <Animated.View entering={FadeInDown.delay(index * 100).duration(600)}>
+            <Pressable
+                onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
+                style={({ pressed }) => [
+                    styles.largeCard,
+                    { transform: [{ scale: pressed ? 0.98 : 1 }] }
+                ]}
+            >
+                <Image
+                    source={{ uri: resolveImageUrl(event.coverImage) }}
+                    style={styles.largeImage}
+                    contentFit="cover"
+                />
+                <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.8)"]}
+                    style={styles.largeOverlay}
+                />
+                <View style={styles.largeContent}>
+                    <View>
+                        <ThemedText style={styles.largeDate}>{safeFormat(event.startDate, "d MMM yyyy")}</ThemedText>
+                        <ThemedText type="h3" style={styles.largeTitle}>{event.title}</ThemedText>
+                    </View>
+                    <View style={styles.actionIcon}>
+                        <Feather name="arrow-up-right" size={24} color="#FFF" />
+                    </View>
                 </View>
-                <Pressable
-                    onPress={() => navigation.navigate("Notifications")}
-                    style={({ pressed }) => [
-                        styles.notificationButton,
-                        {
-                            backgroundColor: theme.backgroundSecondary,
-                            opacity: pressed ? 0.7 : 1
-                        }
-                    ]}
-                >
-                    <Feather name="bell" size={20} color={theme.text} />
-                    <View style={[styles.notifBadge, { backgroundColor: theme.primary, borderColor: theme.backgroundRoot }]} />
-                </Pressable>
-            </View>
+            </Pressable>
+        </Animated.View>
+    );
 
-            {/* Search Bar */}
+    const ListHeader = () => (
+        <View>
+            {/* Header Block with Gradient */}
+            <LinearGradient
+                colors={["#A855F7", "#EC4899"]} // Deep Purple to Pinkish
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.headerGradient, { paddingTop: insets.top + Spacing.lg }]}
+            >
+                <View style={styles.headerTopRow}>
+                    <View>
+                        <View style={styles.locationLabelRow}>
+                            <Feather name="compass" size={14} color="rgba(255,255,255,0.8)" />
+                            <ThemedText style={styles.locationLabel}>Events near me</ThemedText>
+                        </View>
+                        <ThemedText style={styles.locationTitle}>California, USA</ThemedText>
+                    </View>
+                    <Pressable
+                        onPress={() => navigation.navigate("Notifications")}
+                        style={({ pressed }) => [
+                            styles.notifButton,
+                            { opacity: pressed ? 0.7 : 1 }
+                        ]}
+                    >
+                        <Feather name="bell" size={22} color="#000" />
+                        <View style={styles.notifBadgeCircle} />
+                    </Pressable>
+                </View>
+            </LinearGradient>
+
+            {/* Overlapping Search Bar */}
             <View style={styles.searchWrapper}>
-                <View style={[styles.searchContainer, { backgroundColor: theme.backgroundSecondary }]}>
-                    <Feather name="search" size={20} color={theme.textSecondary} style={{ marginLeft: 16 }} />
+                <View style={[styles.searchInputContainer, Shadows.lg]}>
+                    <Feather name="search" size={20} color={theme.textSecondary} />
                     <TextInput
-                        style={[styles.searchInput, { color: theme.text }]}
-                        placeholder="Search for events..."
-                        placeholderTextColor={theme.textSecondary + '70'}
+                        style={styles.searchInput}
+                        placeholder="Search events"
+                        placeholderTextColor={theme.textSecondary + "90"}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
-                    {searchQuery.length > 0 && (
-                        <Pressable onPress={() => setSearchQuery("")} style={{ marginRight: 16 }}>
-                            <Feather name="x" size={18} color={theme.textSecondary} />
-                        </Pressable>
-                    )}
+                    <Pressable style={styles.filterButton}>
+                        <Feather name="sliders" size={18} color={theme.textSecondary} />
+                    </Pressable>
                 </View>
             </View>
 
-            {/* Categories */}
-            <View style={{ height: 60 }}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoriesContainer}
-                >
-                    {categories.map((category) => {
-                        const isSelected = selectedCategory === category;
-                        return (
-                            <Pressable
-                                key={category}
-                                onPress={() => {
-                                    setSelectedCategory(category);
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }}
-                                style={[
-                                    styles.categoryChip,
-                                    {
-                                        backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
-                                        borderColor: isSelected ? theme.primary : theme.border,
-                                        borderWidth: 1
-                                    }
-                                ]}
-                            >
-                                <ThemedText
-                                    style={[
-                                        styles.categoryText,
-                                        { color: isSelected ? "#fff" : theme.textSecondary }
-                                    ]}
-                                >
-                                    {category}
-                                </ThemedText>
-                            </Pressable>
-                        );
-                    })}
-                </ScrollView>
+            {/* Upcoming Events Section */}
+            <View style={styles.sectionHeader}>
+                <ThemedText type="h2" style={styles.sectionTitle}>Upcoming Events</ThemedText>
+            </View>
+            <FlatList
+                horizontal
+                data={upcomingEvents}
+                renderItem={renderUpcomingCard}
+                keyExtractor={(item) => `upcoming-${item.id}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.upcomingList}
+                snapToInterval={width * 0.7 + Spacing.lg}
+                decelerationRate="fast"
+            />
+
+            {/* Top Picks Section */}
+            <View style={styles.sectionHeaderWithAction}>
+                <ThemedText type="h2" style={styles.sectionTitle}>Top Picks 🔥</ThemedText>
+                <Pressable>
+                    <ThemedText style={styles.viewAllText}>View All</ThemedText>
+                </Pressable>
             </View>
 
-            <Animated.FlatList
-                itemLayoutAnimation={Layout.springify()}
-                data={filteredEvents}
-                renderItem={renderEventCard}
-                keyExtractor={(item) => item?.id || Math.random().toString()}
+            {/* Category Chips */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryList}
+            >
+                {categories.map((cat) => (
+                    <Pressable
+                        key={cat.name}
+                        onPress={() => {
+                            setSelectedCategory(cat.name);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        style={[
+                            styles.categoryChip,
+                            {
+                                backgroundColor: selectedCategory === cat.name ? "#9333EA" : theme.backgroundDefault,
+                            },
+                            Shadows.sm
+                        ]}
+                    >
+                        {selectedCategory === cat.name ? (
+                            <View style={styles.activeCategoryIcon}>
+                                <Feather name={cat.icon as any} size={14} color="#9333EA" />
+                            </View>
+                        ) : (
+                            <Feather name={cat.icon as any} size={16} color={theme.textSecondary} />
+                        )}
+                        <ThemedText
+                            style={[
+                                styles.categoryLabel,
+                                { color: selectedCategory === cat.name ? "#FFF" : theme.textSecondary }
+                            ]}
+                        >
+                            {cat.name}
+                        </ThemedText>
+                    </Pressable>
+                ))}
+            </ScrollView>
+        </View>
+    );
+
+    return (
+        <ThemedView style={styles.container}>
+            <FlatList
+                data={topPickEvents}
+                renderItem={renderLargeCard}
+                keyExtractor={(item) => `pick-${item.id}`}
+                ListHeaderComponent={ListHeader}
                 contentContainerStyle={[
-                    styles.listContent,
-                    { paddingBottom: tabBarHeight + Spacing.xl }
+                    styles.mainList,
+                    { paddingBottom: tabBarHeight + 40 }
                 ]}
                 showsVerticalScrollIndicator={false}
-                windowSize={5}
-                maxToRenderPerBatch={5}
-                initialNumToRender={5}
-                removeClippedSubviews={Platform.OS === 'android'}
                 refreshing={isFetching}
                 onRefresh={refetch}
-
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        {!isLoading && !isFetching && (
+                        {!isLoading && (
                             <>
-                                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                                    <Feather name="calendar" size={32} color={theme.textSecondary} />
-                                </View>
-                                <ThemedText type="h4">No Events Found</ThemedText>
-                                <ThemedText style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 8 }}>
-                                    Try adjusting your search or filters to find what you're looking for.
+                                <MaterialCommunityIcons name="calendar-search" size={64} color={theme.textSecondary} />
+                                <ThemedText type="h3" style={{ marginTop: 16 }}>No events found</ThemedText>
+                                <ThemedText style={{ color: theme.textSecondary, textAlign: 'center' }}>
+                                    Try searching for something else
                                 </ThemedText>
                             </>
                         )}
-                        {isLoading && <ActivityIndicator color={theme.primary} />}
+                        {isLoading && <ActivityIndicator color={theme.primary} size="large" />}
                     </View>
                 }
             />
-
         </ThemedView>
     );
 }
@@ -271,159 +275,223 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
+    headerGradient: {
         paddingHorizontal: Spacing.lg,
-        paddingBottom: Spacing.md,
+        paddingBottom: 60,
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+    },
+    headerTopRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
     },
-    notificationButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
+    locationLabelRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
     },
-    notifBadge: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
+    locationLabel: {
+        fontSize: 12,
+        color: "rgba(255,255,255,0.8)",
+        fontWeight: "500",
+    },
+    locationTitle: {
+        fontSize: 28,
+        fontWeight: "800",
+        color: "#FFF",
+        marginTop: 4,
+    },
+    notifButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: "#FFF",
+        justifyContent: "center",
+        alignItems: "center",
+        ...Shadows.md,
+    },
+    notifBadgeCircle: {
+        position: "absolute",
+        top: 14,
+        right: 14,
         width: 8,
         height: 8,
         borderRadius: 4,
-        borderWidth: 2,
-        borderColor: '#000', // Matches background
+        backgroundColor: "#FF3B30",
+        borderWidth: 1.5,
+        borderColor: "#FFF",
     },
     searchWrapper: {
+        marginTop: -30,
         paddingHorizontal: Spacing.lg,
-        marginBottom: Spacing.md,
     },
-    searchContainer: {
-        borderRadius: BorderRadius.xl,
+    searchInputContainer: {
         flexDirection: "row",
         alignItems: "center",
-        height: 50,
-        ...Shadows.sm,
+        backgroundColor: "#FFF",
+        height: 60,
+        borderRadius: 30,
+        paddingHorizontal: 20,
+        gap: 12,
     },
     searchInput: {
         flex: 1,
-        height: '100%',
-        paddingHorizontal: 12,
-        fontSize: 15,
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontSize: 16,
+        color: "#111",
+        fontWeight: "500",
     },
-    categoriesContainer: {
+    filterButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "#F3F4F6",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    sectionHeader: {
         paddingHorizontal: Spacing.lg,
-        paddingBottom: Spacing.md,
-        gap: Spacing.sm,
-        alignItems: 'center',
+        marginTop: 32,
+        marginBottom: 16,
     },
-    categoryChip: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: BorderRadius.full,
+    sectionHeaderWithAction: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: Spacing.lg,
+        marginTop: 32,
+        marginBottom: 16,
     },
-    categoryText: {
+    sectionTitle: {
+        fontSize: 22,
+        fontWeight: "800",
+    },
+    viewAllText: {
+        color: "#6B7280",
         fontSize: 14,
-        fontWeight: "700",
+        fontWeight: "600",
+        textDecorationLine: "underline",
     },
-    listContent: {
+    upcomingList: {
         paddingHorizontal: Spacing.lg,
-        paddingTop: Spacing.sm,
-        gap: Spacing.xl,
+        paddingBottom: 10,
+        gap: Spacing.lg,
     },
-    card: {
-        borderRadius: BorderRadius["2xl"],
-
-        overflow: "hidden",
-    },
-    cardImageContainer: {
-        height: 200,
-        width: '100%',
-        position: 'relative',
-    },
-    cardImage: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    imageTag: {
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    dateBadge: {
-        position: 'absolute',
-        bottom: 12,
-        right: 12,
-        borderRadius: BorderRadius.lg,
-        padding: 8,
-        alignItems: 'center',
-        minWidth: 50,
-        ...Shadows.md,
-    },
-    dateMonth: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#E74C3C',
-        textTransform: 'uppercase',
-    },
-    dateDay: {
-        fontSize: 20,
-        fontWeight: '900',
-        color: '#1A1A1A',
-    },
-    cardContent: {
-        padding: Spacing.lg,
+    upcomingCard: {
+        width: width * 0.7,
+        borderRadius: 24,
+        padding: 10,
+        flexDirection: "row",
+        alignItems: "center",
         gap: 12,
     },
-    cardTitle: {
-        fontSize: 20,
-        fontWeight: '800',
+    upcomingImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 18,
     },
-    metaContainer: {
+    upcomingInfo: {
+        flex: 1,
+        gap: 4,
+    },
+    upcomingDate: {
+        fontSize: 12,
+        color: "#9333EA",
+        fontWeight: "700",
+    },
+    upcomingTitle: {
+        fontSize: 16,
+        fontWeight: "700",
+        lineHeight: 20,
+    },
+    upcomingLocation: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
+    upcomingLocationText: {
+        fontSize: 12,
+        color: "#6B7280",
+    },
+    categoryList: {
+        paddingHorizontal: Spacing.lg,
+        paddingBottom: 20,
+        gap: 12,
+    },
+    categoryChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 25,
         gap: 8,
     },
-    metaRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 4,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.05)',
-    },
-    attendeesContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    attendeeCircle: {
+    activeCategoryIcon: {
         width: 24,
         height: 24,
         borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: "#FFF",
+        justifyContent: "center",
+        alignItems: "center",
     },
-    priceTag: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
+    categoryLabel: {
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    mainList: {
+        paddingBottom: 20,
+    },
+    largeCard: {
+        marginHorizontal: Spacing.lg,
+        height: 240,
+        borderRadius: 32,
+        overflow: "hidden",
+        marginBottom: 20,
+        ...Shadows.lg,
+    },
+    largeImage: {
+        width: "100%",
+        height: "100%",
+    },
+    largeOverlay: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    largeContent: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 24,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-end",
+    },
+    largeDate: {
+        color: "rgba(255,255,255,0.8)",
+        fontSize: 14,
+        fontWeight: "600",
+        marginBottom: 4,
+    },
+    largeTitle: {
+        color: "#FFF",
+        fontSize: 24,
+        fontWeight: "800",
+        maxWidth: "80%",
+    },
+    actionIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: "rgba(255,255,255,0.25)",
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.3)",
     },
     emptyContainer: {
         padding: 60,
         alignItems: 'center',
         justifyContent: 'center',
     },
-
 });
+

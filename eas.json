@@ -19,6 +19,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "horizontal-nedda-technocompany-d67bfb10.koyeb.app"
       }
