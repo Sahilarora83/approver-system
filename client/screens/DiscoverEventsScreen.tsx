@@ -3,33 +3,35 @@ import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityI
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Location from 'expo-location';
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { format } from "date-fns";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { resolveImageUrl } from "@/lib/query-client";
-import Animated, { FadeInDown, FadeInRight, Layout } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeInRight, FadeInUp } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 
 const CATEGORIES = [
-    { name: "All", icon: "grid" },
-    { name: "Music", icon: "music" },
-    { name: "Tech", icon: "cpu" },
-    { name: "Concert", icon: "mic" },
-    { name: "Design", icon: "layers" },
-    { name: "Social", icon: "users" },
+    { name: "All", icon: "✅" },
+    { name: "Music", icon: "🎵" },
+    { name: "Art", icon: "🎨" },
+    { name: "Workshop", icon: "💼" },
+    { name: "Tech", icon: "💻" },
+    { name: "Food", icon: "🍔" },
 ];
 
 export default function DiscoverEventsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
-    const { theme, isDark } = useTheme();
+    const { theme } = useTheme();
+    const { user } = useAuth();
     const tabBarHeight = useBottomTabBarHeight();
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -46,7 +48,11 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         (async () => {
             try {
                 let { status } = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted') return;
+                if (status !== 'granted') {
+                    setUserCity("New York, USA");
+                    setIsLocationLoading(false);
+                    return;
+                }
 
                 let location = await Location.getCurrentPositionAsync({});
                 let geocode = await Location.reverseGeocodeAsync({
@@ -57,15 +63,22 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 if (geocode.length > 0) {
                     const city = geocode[0].city || geocode[0].region || "Your Location";
                     const country = geocode[0].country || "";
-                    setUserCity(`${city}${country ? ', ' + country : ''}`);
+                    setUserCity(`${city}${country ? ', ' + country : ''} `);
                 }
             } catch (error) {
                 console.error("Location error", error);
-                setUserCity("Location unavailable");
+                setUserCity("New York, USA");
             } finally {
                 setIsLocationLoading(false);
             }
         })();
+    }, []);
+
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good Morning 👋";
+        if (hour < 18) return "Good Afternoon ☀️";
+        return "Good Evening 🌙";
     }, []);
 
     const safeFormat = (date: any, formatStr: string) => {
@@ -78,6 +91,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
             return "TBD";
         }
     };
+
+    const featuredEvents = useMemo(() => events.slice(0, 5), [events]);
 
     const filteredEvents = useMemo(() => {
         return events.filter((event: any) => {
@@ -98,151 +113,135 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         });
     }, [events, searchQuery, selectedCategory]);
 
-    const upcomingEvents = useMemo(() => events.slice(0, 8), [events]);
-
-    const renderUpcomingCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
+    const renderFeaturedCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
         <Animated.View entering={FadeInRight.delay(index * 100).duration(500)}>
             <Pressable
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
                 style={({ pressed }) => [
-                    styles.upcomingCard,
-                    { backgroundColor: theme.backgroundDefault, transform: [{ scale: pressed ? 0.96 : 1 }] },
-                    Shadows.md
-                ]}
-            >
-                <View style={styles.upcomingImageWrapper}>
-                    <Image
-                        source={{ uri: resolveImageUrl(event.coverImage) }}
-                        style={styles.upcomingImage}
-                        contentFit="cover"
-                        transition={300}
-                    />
-                    <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.4)"]}
-                        style={StyleSheet.absoluteFill}
-                    />
-                </View>
-                <View style={styles.upcomingInfo}>
-                    <ThemedText style={styles.upcomingDate}>{safeFormat(event.startDate, "d MMM")}</ThemedText>
-                    <ThemedText type="h4" numberOfLines={1} style={styles.upcomingTitle}>{event.title}</ThemedText>
-                    <View style={styles.upcomingLocation}>
-                        <Feather name="map-pin" size={10} color={theme.textSecondary} />
-                        <ThemedText style={styles.upcomingLocationText} numberOfLines={1}>
-                            {event.location || "Nearby"}
-                        </ThemedText>
-                    </View>
-                </View>
-            </Pressable>
-        </Animated.View>
-    ), [theme, navigation]);
-
-    const renderLargeCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
-        <Animated.View entering={FadeInDown.delay(index * 100).duration(600)}>
-            <Pressable
-                onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
-                style={({ pressed }) => [
-                    styles.largeCard,
+                    styles.featuredCard,
                     { transform: [{ scale: pressed ? 0.98 : 1 }] }
                 ]}
             >
-                <Image
-                    source={{ uri: resolveImageUrl(event.coverImage) }}
-                    style={styles.largeImage}
-                    contentFit="cover"
-                />
-                <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.8)"]}
-                    style={styles.largeOverlay}
-                />
-                <View style={styles.largeContent}>
-                    <View style={{ flex: 1 }}>
-                        <ThemedText style={styles.largeDate}>{safeFormat(event.startDate, "EEEE, d MMM yyyy")}</ThemedText>
-                        <ThemedText type="h3" style={styles.largeTitle}>{event.title}</ThemedText>
+                <View style={styles.featuredImageContainer}>
+                    <Image
+                        source={{ uri: resolveImageUrl(event.coverImage) }}
+                        style={styles.featuredImage}
+                        contentFit="cover"
+                        transition={300}
+                    />
+                    <View style={styles.featuredTypeBadge}>
+                        <ThemedText style={styles.featuredTypeText}>Featured</ThemedText>
                     </View>
-                    <View style={styles.actionIcon}>
-                        <Feather name="arrow-up-right" size={24} color="#FFF" />
+                </View>
+                <View style={styles.featuredContent}>
+                    <ThemedText style={styles.featuredTitle} numberOfLines={1}>{event.title}</ThemedText>
+                    <ThemedText style={styles.featuredDate}>
+                        {safeFormat(event.startDate, "EEE, MMM d")} • {safeFormat(event.startDate, "HH:mm")}
+                    </ThemedText>
+                    <View style={styles.featuredFooter}>
+                        <View style={styles.featuredLocation}>
+                            <Feather name="map-pin" size={14} color="#7C3AED" />
+                            <ThemedText style={styles.featuredLocationText} numberOfLines={1}>
+                                {event.location || "Online"}
+                            </ThemedText>
+                        </View>
+                        <Pressable style={styles.favButton}>
+                            <Feather name="heart" size={18} color="#7C3AED" />
+                        </Pressable>
                     </View>
                 </View>
             </Pressable>
         </Animated.View>
     ), [navigation]);
 
-    // Refactored Header to prevent re-renders on every keystroke
-    const ListHeader = useMemo(() => (
-        <View>
-            <LinearGradient
-                colors={["#A855F7", "#EC4899"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.headerGradient, { paddingTop: insets.top + Spacing.lg }]}
+    const renderSecondaryCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
+        <Animated.View entering={FadeInDown.delay(index * 50).duration(500)} style={styles.secondaryCardWrapper}>
+            <Pressable
+                onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
+                style={styles.secondaryCard}
             >
-                <View style={styles.headerTopRow}>
-                    <View>
-                        <View style={styles.locationLabelRow}>
-                            <Feather name="compass" size={14} color="rgba(255,255,255,0.8)" />
-                            <ThemedText style={styles.locationLabel}>Events near me</ThemedText>
-                        </View>
-                        {isLocationLoading ? (
-                            <View style={styles.locationSkeleton} />
-                        ) : (
-                            <ThemedText style={styles.locationTitle}>{userCity}</ThemedText>
-                        )}
-                    </View>
-                    <Pressable
-                        onPress={() => navigation.navigate("Notifications")}
-                        style={({ pressed }) => [
-                            styles.notifButton,
-                            { opacity: pressed ? 0.7 : 1 }
-                        ]}
-                    >
-                        <Feather name="bell" size={22} color="#000" />
-                        <View style={styles.notifBadgeCircle} />
-                    </Pressable>
+                <Image
+                    source={{ uri: resolveImageUrl(event.coverImage) }}
+                    style={styles.secondaryImage}
+                    contentFit="cover"
+                />
+                <View style={styles.secondaryContent}>
+                    <ThemedText style={styles.secondaryTitle} numberOfLines={1}>{event.title}</ThemedText>
+                    <ThemedText style={styles.secondaryDetail}>
+                        {safeFormat(event.startDate, "MMM d")} • {event.location || "TBD"}
+                    </ThemedText>
                 </View>
-            </LinearGradient>
+            </Pressable>
+        </Animated.View>
+    ), [navigation]);
 
-            <View style={styles.searchWrapper}>
-                <View style={[styles.searchInputContainer, Shadows.lg]}>
-                    <Feather name="search" size={20} color={theme.textSecondary} />
+    const ListHeader = useMemo(() => (
+        <View style={styles.headerContent}>
+            {/* User Profile Info */}
+            <View style={styles.userRow}>
+                <View style={styles.userInfo}>
+                    <Image
+                        source={{ uri: user?.profileImage ? resolveImageUrl(user.profileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "guest"}` }}
+                        style={styles.avatar}
+                    />
+                    <View style={styles.userText}>
+                        <ThemedText style={styles.greetingText}>{greeting}</ThemedText>
+                        <ThemedText style={styles.userName}>{user?.name || "Andrew Ainsley"}</ThemedText>
+                    </View>
+                </View >
+                <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.iconButton}>
+                    <Feather name="bell" size={24} color="#FFF" />
+                    <View style={styles.notifBadge} />
+                </Pressable>
+            </View >
+
+            {/* Search Bar */}
+            < View style={styles.searchBarContainer} >
+                <View style={styles.searchBar}>
+                    <Feather name="search" size={20} color="#6B7280" />
                     <TextInput
-                        style={[styles.searchInput, { color: '#111' }]}
-                        placeholder="Search events"
-                        placeholderTextColor="#999"
+                        style={styles.searchInput}
+                        placeholder="What event are you looking for?"
+                        placeholderTextColor="#6B7280"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
-                    <Pressable style={styles.filterButton}>
-                        <Feather name="sliders" size={18} color={theme.textSecondary} />
+                    <Pressable style={styles.filterBarIcon}>
+                        <MaterialCommunityIcons name="tune-variant" size={20} color="#7C3AED" />
                     </Pressable>
                 </View>
-            </View>
+            </View >
 
-            <View style={styles.sectionHeader}>
-                <ThemedText type="h2" style={styles.sectionTitle}>Upcoming Events</ThemedText>
-            </View>
-
+            {/* Featured Section */}
+            < View style={styles.sectionTitleRow} >
+                <ThemedText style={styles.sectionTitleMain}>Featured</ThemedText>
+                <Pressable onPress={() => { }}>
+                    <ThemedText style={styles.seeAllText}>See All</ThemedText>
+                </Pressable>
+            </View >
             <FlatList
                 horizontal
-                data={upcomingEvents}
-                renderItem={renderUpcomingCard}
-                keyExtractor={(item) => `upcoming-${item.id}`}
+                data={featuredEvents}
+                renderItem={renderFeaturedCard}
+                keyExtractor={(item) => `featured-${item.id}`}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.upcomingList}
-                snapToInterval={width * 0.55 + Spacing.lg}
+                contentContainerStyle={styles.featuredList}
+                snapToInterval={width * 0.75 + Spacing.md}
                 decelerationRate="fast"
             />
 
-            <View style={styles.sectionHeaderWithAction}>
-                <ThemedText type="h2" style={styles.sectionTitle}>Top Picks 🔥</ThemedText>
-                <Pressable>
-                    <ThemedText style={styles.viewAllText}>View All</ThemedText>
+            {/* Popular/Categories Section */}
+            <View style={styles.sectionTitleRow}>
+                <ThemedText style={styles.sectionTitleMain}>Popular Event 🔥</ThemedText>
+                <Pressable onPress={() => { }}>
+                    <ThemedText style={styles.seeAllText}>See All</ThemedText>
                 </Pressable>
             </View>
-
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryList}
+                style={styles.categoryScroll}
+                contentContainerStyle={styles.categoryContent}
             >
                 {CATEGORIES.map((cat) => (
                     <Pressable
@@ -253,62 +252,50 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         }}
                         style={[
                             styles.categoryChip,
-                            {
-                                backgroundColor: selectedCategory === cat.name ? "#9333EA" : theme.backgroundDefault,
-                            },
-                            Shadows.sm
+                            selectedCategory === cat.name && styles.categoryChipActive
                         ]}
                     >
-                        {selectedCategory === cat.name ? (
-                            <View style={styles.activeCategoryIcon}>
-                                <Feather name={cat.icon as any} size={14} color="#9333EA" />
-                            </View>
-                        ) : (
-                            <Feather name={cat.icon as any} size={16} color={theme.textSecondary} />
-                        )}
-                        <ThemedText
-                            style={[
-                                styles.categoryLabel,
-                                { color: selectedCategory === cat.name ? "#FFF" : theme.textSecondary }
-                            ]}
-                        >
-                            {cat.name}
-                        </ThemedText>
+                        <ThemedText style={styles.categoryIcon}>{cat.icon}</ThemedText>
+                        <ThemedText style={[
+                            styles.categoryText,
+                            selectedCategory === cat.name && styles.categoryTextActive
+                        ]}>{cat.name}</ThemedText>
                     </Pressable>
                 ))}
             </ScrollView>
-        </View>
-    ), [userCity, insets.top, navigation, theme, searchQuery, selectedCategory, upcomingEvents, renderUpcomingCard]);
+        </View >
+    ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard]);
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
             <FlatList
-                data={filteredEvents}
-                renderItem={renderLargeCard}
-                keyExtractor={(item) => `pick-${item.id}`}
+                data={filteredEvents.slice(5)} // Remaining events after featured
+                renderItem={renderSecondaryCard}
+                keyExtractor={(item) => `popular-${item.id}`}
                 ListHeaderComponent={ListHeader}
+                showsVerticalScrollIndicator={false}
+                numColumns={2}
+                columnWrapperStyle={styles.popularRow}
                 contentContainerStyle={[
                     styles.mainList,
-                    { paddingBottom: tabBarHeight + 40 }
+                    { paddingBottom: tabBarHeight + 20 }
                 ]}
-                showsVerticalScrollIndicator={false}
                 refreshing={isFetching}
                 onRefresh={refetch}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        {!isLoading && (
+                    <View style={styles.emptyState}>
+                        {isLoading ? (
+                            <ActivityIndicator size="large" color="#7C3AED" />
+                        ) : (
                             <>
-                                <MaterialCommunityIcons name="calendar-search" size={64} color={theme.textSecondary} />
-                                <ThemedText type="h3" style={{ marginTop: 16 }}>No events found</ThemedText>
-                                <ThemedText style={{ color: theme.textSecondary, textAlign: 'center' }}>
-                                    Try searching for something else
-                                </ThemedText>
+                                <Image
+                                    source={require("@/assets/images/icon.png")}
+                                    style={styles.emptyImage}
+                                    contentFit="contain"
+                                />
+                                <ThemedText style={styles.emptyTitle}>No Events Found</ThemedText>
+                                <ThemedText style={styles.emptySub}>Try searching for something else</ThemedText>
                             </>
-                        )}
-                        {isLoading && (
-                            <View style={{ marginTop: 40 }}>
-                                <ActivityIndicator color={theme.primary} size="large" />
-                            </View>
                         )}
                     </View>
                 }
@@ -320,94 +307,85 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: "#111827", // Dark theme like screenshot
     },
-    headerGradient: {
-        paddingHorizontal: Spacing.lg,
-        paddingBottom: 60,
-        borderBottomLeftRadius: 40,
-        borderBottomRightRadius: 40,
+    mainList: {
+        paddingBottom: 20,
     },
-    headerTopRow: {
+    headerContent: {
+        marginBottom: Spacing.lg,
+    },
+    userRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        paddingHorizontal: Spacing.lg,
+        marginTop: Spacing.md,
     },
-    locationLabelRow: {
+    userInfo: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 6,
+        gap: 12,
     },
-    locationLabel: {
-        fontSize: 12,
-        color: "rgba(255,255,255,0.8)",
-        fontWeight: "500",
-    },
-    locationTitle: {
-        fontSize: 24,
-        fontWeight: "800",
-        color: "#FFF",
-        marginTop: 4,
-    },
-    locationSkeleton: {
-        width: 140,
-        height: 28,
-        backgroundColor: "rgba(255,255,255,0.2)",
-        borderRadius: 8,
-        marginTop: 4,
-    },
-    notifButton: {
+    avatar: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: "#FFF",
+        backgroundColor: "#374151",
+    },
+    userText: {
+        gap: 2,
+    },
+    greetingText: {
+        fontSize: 14,
+        color: "#9CA3AF",
+    },
+    userName: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#FFF",
+    },
+    iconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "#1F2937",
         justifyContent: "center",
         alignItems: "center",
-        ...Shadows.md,
     },
-    notifBadgeCircle: {
+    notifBadge: {
         position: "absolute",
-        top: 14,
-        right: 14,
+        top: 12,
+        right: 12,
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: "#FF3B30",
-        borderWidth: 1.5,
-        borderColor: "#FFF",
+        backgroundColor: "#EF4444",
+        borderWidth: 2,
+        borderColor: "#1F2937",
     },
-    searchWrapper: {
-        marginTop: -30,
+    searchBarContainer: {
         paddingHorizontal: Spacing.lg,
+        marginTop: 24,
     },
-    searchInputContainer: {
+    searchBar: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#FFF",
-        height: 60,
-        borderRadius: 30,
+        backgroundColor: "#1F2937",
+        height: 56,
+        borderRadius: 28,
         paddingHorizontal: 20,
         gap: 12,
     },
     searchInput: {
         flex: 1,
+        color: "#FFF",
         fontSize: 16,
-        fontWeight: "500",
-        paddingVertical: 10,
     },
-    filterButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "#F3F4F6",
-        justifyContent: "center",
-        alignItems: "center",
+    filterBarIcon: {
+        padding: 4,
     },
-    sectionHeader: {
-        paddingHorizontal: Spacing.lg,
-        marginTop: 32,
-        marginBottom: 16,
-    },
-    sectionHeaderWithAction: {
+    sectionTitleRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
@@ -415,141 +393,174 @@ const styles = StyleSheet.create({
         marginTop: 32,
         marginBottom: 16,
     },
-    sectionTitle: {
-        fontSize: 22,
+    sectionTitleMain: {
+        fontSize: 20,
         fontWeight: "800",
+        color: "#FFF",
     },
-    viewAllText: {
-        color: "#6B7280",
-        fontSize: 14,
+    seeAllText: {
+        color: "#7C3AED",
         fontWeight: "600",
-        textDecorationLine: "underline",
+        fontSize: 14,
     },
-    upcomingList: {
+    featuredList: {
         paddingHorizontal: Spacing.lg,
-        paddingBottom: 10,
-        gap: Spacing.lg,
+        gap: Spacing.md,
     },
-    upcomingCard: {
-        width: width * 0.55,
-        borderRadius: 20,
-        overflow: 'hidden',
-        padding: 8,
-        gap: 8,
+    featuredCard: {
+        width: width * 0.75,
+        backgroundColor: "#1F2937",
+        borderRadius: 32,
+        overflow: "hidden",
+        ...Shadows.lg,
     },
-    upcomingImageWrapper: {
-        width: '100%',
-        height: 120,
-        borderRadius: 16,
-        overflow: 'hidden',
+    featuredImageContainer: {
+        width: "100%",
+        height: 200,
     },
-    upcomingImage: {
-        width: '100%',
-        height: '100%',
+    featuredImage: {
+        width: "100%",
+        height: "100%",
     },
-    upcomingInfo: {
-        paddingHorizontal: 4,
-        gap: 2,
+    featuredTypeBadge: {
+        position: "absolute",
+        top: 16,
+        left: 16,
+        backgroundColor: "rgba(124, 58, 237, 0.8)",
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
-    upcomingDate: {
-        fontSize: 12,
-        color: "#9333EA",
-        fontWeight: "700",
-        textTransform: 'uppercase',
+    featuredTypeText: {
+        color: "#FFF",
+        fontSize: 10,
+        fontWeight: "bold",
     },
-    upcomingTitle: {
-        fontSize: 15,
-        fontWeight: "700",
-        lineHeight: 18,
+    featuredContent: {
+        padding: 20,
+        gap: 6,
     },
-    upcomingLocation: {
+    featuredTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#FFF",
+    },
+    featuredDate: {
+        fontSize: 13,
+        color: "#7C3AED",
+        fontWeight: "600",
+    },
+    featuredFooter: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 8,
+    },
+    featuredLocation: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 4,
+        gap: 6,
+        flex: 1,
     },
-    upcomingLocationText: {
-        fontSize: 11,
-        color: "#6B7280",
+    featuredLocationText: {
+        fontSize: 13,
+        color: "#9CA3AF",
     },
-    categoryList: {
+    favButton: {
+        padding: 4,
+    },
+    categoryScroll: {
+        marginBottom: 8,
+    },
+    categoryContent: {
         paddingHorizontal: Spacing.lg,
-        paddingBottom: 20,
         gap: 12,
     },
     categoryChip: {
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 25,
+        paddingVertical: 10,
+        borderRadius: 24,
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderColor: "#7C3AED",
         gap: 8,
     },
-    activeCategoryIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: "#FFF",
-        justifyContent: "center",
-        alignItems: "center",
+    categoryChipActive: {
+        backgroundColor: "#7C3AED",
+        borderColor: "#7C3AED",
     },
-    categoryLabel: {
+    categoryIcon: {
+        fontSize: 16,
+    },
+    categoryText: {
         fontSize: 14,
         fontWeight: "700",
+        color: "#7C3AED",
     },
-    mainList: {
-        paddingBottom: 20,
-    },
-    largeCard: {
-        marginHorizontal: Spacing.lg,
-        height: 240,
-        borderRadius: 32,
-        overflow: "hidden",
-        marginBottom: 20,
-        ...Shadows.lg,
-    },
-    largeImage: {
-        width: "100%",
-        height: "100%",
-    },
-    largeOverlay: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    largeContent: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 24,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-end",
-    },
-    largeDate: {
-        color: "rgba(255,255,255,0.8)",
-        fontSize: 14,
-        fontWeight: "600",
-        marginBottom: 4,
-    },
-    largeTitle: {
+    categoryTextActive: {
         color: "#FFF",
-        fontSize: 22,
+    },
+    popularRow: {
+        paddingHorizontal: Spacing.lg,
+        justifyContent: "space-between",
+    },
+    secondaryCardWrapper: {
+        width: "48%",
+        marginBottom: 20,
+    },
+    secondaryCard: {
+        width: "100%",
+        backgroundColor: "#1F2937",
+        borderRadius: 24,
+        overflow: "hidden",
+        ...Shadows.sm,
+    },
+    secondaryImage: {
+        width: "100%",
+        height: 150,
+    },
+    secondaryContent: {
+        padding: 12,
+        gap: 4,
+    },
+    secondaryTitle: {
+        fontSize: 15,
         fontWeight: "800",
+        color: "#FFF",
     },
-    actionIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: "rgba(255,255,255,0.25)",
-        justifyContent: "center",
+    secondaryDetail: {
+        fontSize: 12,
+        color: "#9CA3AF",
+    },
+    emptyState: {
+        padding: 40,
         alignItems: "center",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.3)",
+        justifyContent: "center",
+        marginTop: 40,
     },
-    emptyContainer: {
-        padding: 60,
-        alignItems: 'center',
-        justifyContent: 'center',
+    emptyImage: {
+        width: 120,
+        height: 120,
+        opacity: 0.5,
+        marginBottom: 20,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#FFF",
+    },
+    emptySub: {
+        fontSize: 14,
+        color: "#9CA3AF",
+        marginTop: 4,
+    },
+    locationSkeleton: {
+        width: 140,
+        height: 28,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        marginTop: 4,
     },
 });
-
-

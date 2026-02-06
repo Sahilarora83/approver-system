@@ -1,57 +1,27 @@
 import React, { useCallback, useMemo } from "react";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
-import { useScreenOptions } from "@/hooks/useScreenOptions";
-import { HeaderTitle } from "@/components/HeaderTitle";
 import { TabIcon } from "@/components/TabIcon";
 
 import DiscoverEventsScreen from "@/screens/DiscoverEventsScreen";
 import ParticipantEventDetailScreen from "@/screens/ParticipantEventDetailScreen";
 import MyTicketsScreen from "@/screens/MyTicketsScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
+import ExploreScreen from "@/screens/ExploreScreen";
+import FavoritesScreen from "@/screens/FavoritesScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function DiscoverStack() {
-  const screenOptions = useScreenOptions();
   return (
-    <Stack.Navigator screenOptions={{ ...screenOptions, headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="DiscoverEvents" component={DiscoverEventsScreen} />
       <Stack.Screen name="ParticipantEventDetail" component={ParticipantEventDetailScreen} />
-    </Stack.Navigator>
-  );
-}
-
-function TicketsStack() {
-  const screenOptions = useScreenOptions();
-  return (
-    <Stack.Navigator screenOptions={screenOptions}>
-      <Stack.Screen
-        name="MyTickets"
-        component={MyTicketsScreen}
-        options={{
-          headerTitle: () => <HeaderTitle title="My Tickets" />,
-          headerLargeTitle: true,
-        }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-function ProfileStack() {
-  const screenOptions = useScreenOptions();
-  return (
-    <Stack.Navigator screenOptions={screenOptions}>
-      <Stack.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ headerTitle: "Profile" }}
-      />
     </Stack.Navigator>
   );
 }
@@ -62,71 +32,91 @@ export default function ParticipantTabNavigator() {
 
   const renderTabIcon = useCallback(
     (name: any) =>
-      ({ color, size }: { color: string; size: number }) => (
-        <TabIcon name={name} color={color} size={size} />
+      ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
+        <View style={focused ? styles.activeTabContainer : null}>
+          <TabIcon name={name} color={color} size={focused ? 24 : 22} />
+        </View>
       ),
     []
   );
 
-  const tabBarBackground = useCallback(
-    () =>
-      Platform.OS === "ios" ? (
-        <BlurView
-          intensity={80}
-          tint={isDark ? "dark" : "light"}
-          style={StyleSheet.absoluteFill}
-        />
-      ) : null,
-    [isDark]
-  );
-
   const screenOptions = useMemo(
     () => ({
-      tabBarActiveTintColor: theme.primary,
-      tabBarInactiveTintColor: theme.tabIconDefault,
+      tabBarActiveTintColor: "#7C3AED", // Vibrant purple
+      tabBarInactiveTintColor: "#9CA3AF", // Grayish
       tabBarStyle: {
         position: "absolute" as const,
-        backgroundColor: Platform.select({
-          ios: "transparent",
-          android: theme.backgroundRoot,
-        }),
+        backgroundColor: "#111827",
         borderTopWidth: 0,
-        elevation: 8,
-        height: 60 + insets.bottom,
-        paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+        height: 70 + insets.bottom,
+        paddingBottom: insets.bottom + 10,
+        paddingTop: 10,
+        ...Platform.select({
+          ios: {
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: -10 },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+          },
+          android: {
+            elevation: 20,
+          },
+        }),
       },
-      tabBarBackground,
       headerShown: false,
+      tabBarShowLabel: true,
+      tabBarLabelStyle: {
+        fontSize: 10,
+        fontWeight: "600",
+        marginTop: 4,
+      },
     }),
-    [theme, tabBarBackground, insets.bottom]
+    [insets.bottom]
   );
 
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
+    <Tab.Navigator screenOptions={screenOptions as any}>
       <Tab.Screen
-        name="DiscoverTab"
+        name="Home"
         component={DiscoverStack}
         options={{
-          title: "Discover",
-          tabBarIcon: renderTabIcon("compass"),
+          tabBarIcon: renderTabIcon("home"),
         }}
       />
       <Tab.Screen
-        name="TicketsTab"
-        component={TicketsStack}
+        name="Explore"
+        component={ExploreScreen}
         options={{
-          title: "Tickets",
-          tabBarIcon: renderTabIcon("tag"), // changed from credit-card to ticket
+          tabBarIcon: renderTabIcon("search"),
         }}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStack}
+        name="Favorites"
+        component={FavoritesScreen}
         options={{
-          title: "Profile",
+          tabBarIcon: renderTabIcon("heart"),
+        }}
+      />
+      <Tab.Screen
+        name="Tickets"
+        component={MyTicketsScreen}
+        options={{
+          tabBarIcon: renderTabIcon("layers"), // matches screenshot-like icon
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
           tabBarIcon: renderTabIcon("user"),
         }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  activeTabContainer: {
+    // Optional highlight logic if needed
+  }
+});
