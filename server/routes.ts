@@ -433,6 +433,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Favorites Endpoints
+  app.get("/api/favorites", requireAuth, async (req, res) => {
+    try {
+      const favorites = await storage.getFavorites(req.session.userId!);
+      res.json(favorites);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get favorites" });
+    }
+  });
+
+  app.get("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      const isFavorited = await storage.isFavorited(req.session.userId!, String(req.params.eventId));
+      res.json({ isFavorited });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check favorite status" });
+    }
+  });
+
+  app.post("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      await storage.addFavorite(req.session.userId!, String(req.params.eventId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add favorite" });
+    }
+  });
+
+  app.delete("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      await storage.removeFavorite(req.session.userId!, String(req.params.eventId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove favorite" });
+    }
+  });
+
+  // Reviews Endpoints
+  app.get("/api/events/:id/reviews", async (req, res) => {
+    try {
+      const reviews = await storage.getReviews(String(req.params.id));
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get reviews" });
+    }
+  });
+
+  app.post("/api/events/:id/reviews", requireAuth, async (req, res) => {
+    try {
+      const { rating, comment } = req.body;
+      const review = await storage.createReview({
+        eventId: String(req.params.id),
+        userId: req.session.userId!,
+        rating: Number(rating),
+        comment: String(comment || "")
+      });
+      res.json(review);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create review" });
+    }
+  });
+
   app.get("/api/events/:id/registration-status", async (req, res) => {
     try {
       const eventId = String(req.params.id);
@@ -715,7 +777,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/events", requireAuth, async (req, res) => {
     try {
-      const { title, description, location, startDate, endDate, requiresApproval, checkInEnabled, formFields, coverImage, hostedBy, socialLinks } = req.body;
+      const {
+        title, description, location, address, latitude, longitude, category, price,
+        startDate, endDate, requiresApproval, checkInEnabled, formFields, coverImage, hostedBy, socialLinks
+      } = req.body;
       if (!title || !startDate) return res.status(400).json({ message: "Title and start date are required" });
 
       let parsedFormFields = formFields;
@@ -743,7 +808,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizerId: req.session.userId!,
         title,
         description: description || null,
+        category: category || "Music",
         location: location || null,
+        address: address || null,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        price: price || "0",
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         requiresApproval: requiresApproval || false,

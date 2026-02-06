@@ -20,9 +20,14 @@ export const events = pgTable("events", {
   organizerId: varchar("organizer_id").notNull().references(() => users.id),
   title: text("title").notNull(),
   description: text("description"),
+  category: text("category").default("Music"),
   location: text("location"),
+  address: text("address"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
+  price: text("price").default("0"),
   requiresApproval: boolean("requires_approval").default(false),
   checkInEnabled: boolean("check_in_enabled").default(true),
   formFields: jsonb("form_fields").default([]),
@@ -89,6 +94,22 @@ export const broadcasts = pgTable("broadcasts", {
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 });
 
+export const favorites = pgTable("favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const reviews = pgTable("reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
@@ -127,6 +148,8 @@ export type CheckIn = typeof checkIns.$inferSelect;
 export type FormTemplate = typeof formTemplates.$inferSelect;
 export type Follow = typeof follows.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type Favorite = typeof favorites.$inferSelect;
+export type Review = typeof reviews.$inferSelect;
 
 export type FormField = {
   id: string;

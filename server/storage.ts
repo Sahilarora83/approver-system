@@ -1,5 +1,5 @@
 import { supabase, toCamelCase, toSnakeCase } from "./supabase";
-import type { User, Event, Registration, CheckIn, InsertUser, Notification } from "@shared/schema";
+import type { User, Event, Registration, CheckIn, InsertUser, Notification, Favorite, Review } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -56,6 +56,16 @@ export interface IStorage {
   getFollowers(userId: string): Promise<string[]>;
   createBroadcast(data: { eventId: string; organizerId: string; title?: string; message: string }): Promise<void>;
   linkRegistrationsToUser(email: string, userId: string): Promise<void>;
+
+  // Favorites
+  getFavorites(userId: string): Promise<(Favorite & { event: Event })[]>;
+  addFavorite(userId: string, eventId: string): Promise<void>;
+  removeFavorite(userId: string, eventId: string): Promise<void>;
+  isFavorited(userId: string, eventId: string): Promise<boolean>;
+
+  // Reviews
+  getReviews(eventId: string): Promise<(Review & { user: User })[]>;
+  createReview(data: Omit<Review, "id" | "createdAt">): Promise<Review>;
 }
 
 export class SupabaseStorage implements IStorage {
@@ -240,7 +250,12 @@ export class SupabaseStorage implements IStorage {
         organizer_id: eventData.organizerId,
         title: eventData.title,
         description: eventData.description,
+        category: eventData.category,
         location: eventData.location,
+        address: eventData.address,
+        latitude: eventData.latitude,
+        longitude: eventData.longitude,
+        price: eventData.price,
         start_date: eventData.startDate,
         end_date: eventData.endDate,
         requires_approval: eventData.requiresApproval,
@@ -646,6 +661,72 @@ export class SupabaseStorage implements IStorage {
     } else if (process.env.NODE_ENV !== 'production') {
       console.log(`[Storage] Successfully linked registrations for ${email}`);
     }
+  }
+
+  // Favorites Implementation
+  async getFavorites(userId: string): Promise<(Favorite & { event: Event })[]> {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('*, event:events(*)')
+      .eq('user_id', userId);
+
+    if (error) throw new Error(error.message);
+    return (data || []).map(f => ({
+      ...toCamelCase(f),
+      event: toCamelCase(f.event)
+    })) as (Favorite & { event: Event })[];
+  }
+
+  async addFavorite(userId: string, eventId: string): Promise<void> {
+    const { error } = await supabase
+      .from('favorites')
+      .insert({ user_id: userId, event_id: eventId });
+    if (error) throw new Error(error.message);
+  }
+
+  async removeFavorite(userId: string, eventId: string): Promise<void> {
+    const { error } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('event_id', eventId);
+    if (error) throw new Error(error.message);
+  }
+
+  async isFavorited(userId: string, eventId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('event_id', eventId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  }
+
+  // Reviews Implementation
+  async getReviews(eventId: string): Promise<(Review & { user: User })[]> {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*, user:users(*)')
+      .eq('event_id', eventId);
+
+    if (error) throw new Error(error.message);
+    return (data || []).map(r => ({
+      ...toCamelCase(r),
+      user: toCamelCase(r.user)
+    })) as (Review & { user: User })[];
+  }
+
+  async createReview(data: Omit<Review, "id" | "createdAt">): Promise<Review> {
+    const { data: review, error } = await supabase
+      .from('reviews')
+      .insert(toSnakeCase(data))
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return toCamelCase(review) as Review;
   }
 }
 

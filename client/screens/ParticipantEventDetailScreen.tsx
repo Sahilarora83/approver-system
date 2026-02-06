@@ -100,6 +100,37 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const isRejected = registrationStatus === "rejected";
     const isRegistered = isPending || isApproved || isRejected;
 
+    const { data: favoriteStatus, refetch: refetchFavorite } = useQuery({
+        queryKey: [`/api/favorites/${eventId}`],
+        queryFn: async () => {
+            if (!eventId || !user) return { isFavorited: false };
+            const res = await apiRequest("GET", `/api/favorites/${eventId}`);
+            return res.json();
+        },
+        enabled: !!eventId && !!user,
+    });
+
+    const favoriteMutation = useMutation({
+        mutationFn: async () => {
+            const method = favoriteStatus?.isFavorited ? "DELETE" : "POST";
+            await apiRequest(method, `/api/favorites/${eventId}`);
+        },
+        onSuccess: () => {
+            refetchFavorite();
+            queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+    });
+
+    const { data: reviews, isLoading: isReviewsLoading } = useQuery<any[]>({
+        queryKey: [`/api/events/${eventId}/reviews`],
+        queryFn: async () => {
+            const res = await apiRequest("GET", `/api/events/${eventId}/reviews`);
+            return res.json();
+        },
+        enabled: !!eventId,
+    });
+
     const safeFormat = (date: any, formatStr: string) => {
         try {
             if (!date) return "TBD";
@@ -189,8 +220,15 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                             <Pressable style={styles.actionIcon} onPress={handleShare}>
                                 <Feather name="share-2" size={20} color="#FFF" />
                             </Pressable>
-                            <Pressable style={[styles.actionIcon, { marginLeft: 12 }]}>
-                                <Feather name="heart" size={20} color={COLORS.primary} />
+                            <Pressable
+                                style={[styles.actionIcon, { marginLeft: 12 }]}
+                                onPress={() => favoriteMutation.mutate()}
+                            >
+                                <MaterialCommunityIcons
+                                    name={favoriteStatus?.isFavorited ? "heart" : "heart-outline"}
+                                    size={24}
+                                    color={favoriteStatus?.isFavorited ? "#EF4444" : "#FFF"}
+                                />
                             </Pressable>
                         </View>
                     </View>
@@ -284,6 +322,44 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                             </ThemedText>
                         </Pressable>
                     </View>
+
+                    {/* Reviews Section */}
+                    {reviews && reviews.length > 0 && (
+                        <View style={{ marginTop: 32 }}>
+                            <View style={styles.sectionHeader}>
+                                <ThemedText style={styles.sectionTitle}>Reviews ({reviews.length})</ThemedText>
+                                <Pressable>
+                                    <ThemedText style={styles.seeAll}>See all</ThemedText>
+                                </Pressable>
+                            </View>
+                            {reviews.slice(0, 3).map((review, i) => (
+                                <View key={review.id} style={styles.reviewCard}>
+                                    <View style={styles.reviewHeader}>
+                                        <Image
+                                            source={{ uri: `https://api.dicebear.com/7.x/avataaars/svg?seed=${review.userId}` }}
+                                            style={styles.reviewAvatar}
+                                        />
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <ThemedText style={styles.reviewerName}>User {review.userId.slice(0, 5)}</ThemedText>
+                                            <View style={styles.starRow}>
+                                                {[...Array(5)].map((_, j) => (
+                                                    <Feather
+                                                        key={j}
+                                                        name="star"
+                                                        size={12}
+                                                        color={j < review.rating ? "#FBBF24" : "#374151"}
+                                                        style={{ marginRight: 2 }}
+                                                    />
+                                                ))}
+                                            </View>
+                                        </View>
+                                        <ThemedText style={styles.reviewDate}>{format(new Date(review.createdAt), "MMM d")}</ThemedText>
+                                    </View>
+                                    <ThemedText style={styles.reviewComment}>{review.comment}</ThemedText>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
             </Animated.ScrollView>
 
@@ -398,4 +474,12 @@ const styles = StyleSheet.create({
     shareItem: { alignItems: "center", gap: 8 },
     shareIconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: "center", alignItems: "center" },
     shareName: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600" },
+    reviewCard: { backgroundColor: "#1F2937", borderRadius: 20, padding: 16, marginBottom: 12 },
+    reviewHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+    reviewAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.05)" },
+    reviewerName: { fontSize: 14, fontWeight: "800", color: "#FFF" },
+    reviewDate: { fontSize: 12, color: "#9CA3AF" },
+    starRow: { flexDirection: "row", marginTop: 2 },
+    reviewComment: { fontSize: 14, color: "#9CA3AF", lineHeight: 20 },
+    seeAll: { color: COLORS.primary, fontSize: 14, fontWeight: "700" },
 });
