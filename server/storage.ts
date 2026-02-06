@@ -68,6 +68,17 @@ export interface IStorage {
   createReview(data: Omit<Review, "id" | "createdAt">): Promise<Review>;
 
   getEventAttendees(eventId: string, currentUserId?: string): Promise<(User & { isFollowing: boolean })[]>;
+  searchEvents(params: {
+    query?: string;
+    category?: string;
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ events: (Event & { registrationCount: number })[]; total: number }>;
 }
 
 export class SupabaseStorage implements IStorage {
@@ -772,6 +783,55 @@ export class SupabaseStorage implements IStorage {
         isFollowing: followingIds.includes(u.id)
       };
     });
+  }
+
+  async searchEvents(params: {
+    query?: string;
+    category?: string;
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ events: (Event & { registrationCount: number })[]; total: number }> {
+    const limit = params.limit ?? 20;
+    const offset = params.offset ?? 0;
+
+    let query = supabase
+      .from('events')
+      .select('*, registrationCount:registrations(count)', { count: 'exact' });
+
+    if (params.query) {
+      query = query.or(`title.ilike.%${params.query}%,description.ilike.%${params.query}%,location.ilike.%${params.query}%`);
+    }
+
+    if (params.category && params.category !== 'All') {
+      query = query.eq('category', params.category);
+    }
+
+    if (params.startDate) {
+      query = query.gte('start_date', params.startDate.toISOString());
+    }
+
+    if (params.endDate) {
+      query = query.lte('start_date', params.endDate.toISOString());
+    }
+
+    const { data, error, count } = await query
+      .order('start_date', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw new Error(error.message);
+
+    return {
+      events: (data || []).map((item: any) => ({
+        ...toCamelCase(item),
+        registrationCount: item.registrationCount?.[0]?.count || 0,
+      })) as any,
+      total: count || 0,
+    };
   }
 }
 

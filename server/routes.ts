@@ -1085,6 +1085,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Attendees & Following
+  app.get("/api/events/search", async (req, res) => {
+    try {
+      const { q, category, startDate, endDate, limit, offset } = req.query;
+      const results = await storage.searchEvents({
+        query: q as string,
+        category: category as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 20,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "Search failed" });
+    }
+  });
+
   app.get("/api/events/:id/attendees", async (req, res) => {
     try {
       const attendees = await storage.getEventAttendees(req.params.id, req.session.userId);

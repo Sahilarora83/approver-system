@@ -15,7 +15,8 @@ import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { format } from "date-fns";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { resolveImageUrl } from "@/lib/query-client";
-import Animated, { FadeInDown, FadeInRight, FadeInUp } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeInRight, FadeInUp, useAnimatedStyle, withRepeat, withTiming, useSharedValue } from "react-native-reanimated";
+import { Skeleton } from "@/components/Skeleton";
 
 const { width } = Dimensions.get("window");
 
@@ -103,6 +104,44 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 
     const featuredEvents = useMemo(() => events.slice(0, 5), [events]);
 
+    const FeaturedSkeleton = () => (
+        <View style={styles.featuredList}>
+            {[1, 2].map((i) => (
+                <View key={i} style={[styles.featuredCard, { marginRight: 16 }]}>
+                    <Skeleton height={width * 0.55} borderRadius={32} />
+                    <View style={{ padding: 16, gap: 8 }}>
+                        <Skeleton width="80%" height={24} />
+                        <Skeleton width="60%" height={16} />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Skeleton width="40%" height={14} />
+                            <Skeleton width={24} height={24} borderRadius={12} />
+                        </View>
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+
+    const SecondarySkeleton = () => (
+        <View style={styles.popularRow}>
+            {[1, 2, 3, 4].map((i) => (
+                <View key={i} style={styles.secondaryCardWrapper}>
+                    <View style={styles.secondaryCard}>
+                        <Skeleton height={140} borderRadius={24} />
+                        <View style={{ padding: 12, gap: 6 }}>
+                            <Skeleton width="90%" height={18} />
+                            <Skeleton width="70%" height={14} />
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                <Skeleton width="50%" height={12} />
+                                <Skeleton width={16} height={16} borderRadius={8} />
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+
     const filteredEvents = useMemo(() => {
         return events.filter((event: any) => {
             if (!event || !event.title) return false;
@@ -138,26 +177,22 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         contentFit="cover"
                         transition={300}
                     />
-                    <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.4)", "rgba(17, 24, 39, 0.9)"]}
-                        style={StyleSheet.absoluteFill}
-                    />
                 </View>
 
                 <View style={styles.featuredOverlayContent}>
                     <ThemedText style={styles.featuredTitle} numberOfLines={1}>{event.title}</ThemedText>
                     <ThemedText style={styles.featuredDetail} numberOfLines={1}>
-                        {safeFormat(event.startDate, "EEE, MMM d • HH:mm")}
+                        {safeFormat(event.startDate, "EEE, MMM d · HH:mm")}{event.endDate ? ` - ${safeFormat(event.endDate, "HH:mm")}` : ""} {new Date(event.startDate).getHours() >= 12 ? "PM" : "AM"}
                     </ThemedText>
                     <View style={styles.featuredMetaRow}>
                         <View style={styles.featuredInfoItem}>
-                            <Feather name="map-pin" size={14} color="#7C3AED" />
+                            <Feather name="map-pin" size={16} color="#7C3AED" />
                             <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
                                 {event.location || "Online"}
                             </ThemedText>
                         </View>
                         <Pressable style={styles.featuredInlineFav}>
-                            <Feather name="heart" size={20} color="#7C3AED" />
+                            <Feather name="heart" size={22} color="#7C3AED" />
                         </Pressable>
                     </View>
                 </View>
@@ -248,16 +283,20 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     <ThemedText style={styles.seeAllText}>See All</ThemedText>
                 </Pressable>
             </View>
-            <FlatList
-                horizontal
-                data={featuredEvents}
-                renderItem={renderFeaturedCard}
-                keyExtractor={(item) => `featured-${item.id}`}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.featuredList}
-                snapToInterval={width * 0.75 + Spacing.md}
-                decelerationRate="fast"
-            />
+            {isLoading ? (
+                <FeaturedSkeleton />
+            ) : (
+                <FlatList
+                    horizontal
+                    data={featuredEvents}
+                    renderItem={renderFeaturedCard}
+                    keyExtractor={(item) => `featured-${item.id}`}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.featuredList}
+                    snapToInterval={width * 0.85 + 16}
+                    decelerationRate="fast"
+                />
+            )}
 
             {/* Popular/Categories Section */}
             <View style={styles.sectionTitleRow}>
@@ -284,19 +323,14 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                             selectedCategory === cat.name && styles.categoryChipActive
                         ]}
                     >
-                        {cat.lib === "Feather" ? (
-                            <Feather
-                                name={cat.icon as any}
-                                size={16}
-                                color={selectedCategory === cat.name ? "#FFF" : "#FBBF24"}
-                            />
-                        ) : (
-                            <MaterialCommunityIcons
-                                name={cat.icon as any}
-                                size={18}
-                                color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"}
-                            />
-                        )}
+                        <View style={styles.categoryBadgeIcon}>
+                            {cat.name === "All" && <Feather name="check-circle" size={16} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                            {cat.name === "Music" && <Feather name="music" size={16} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                            {cat.name === "Art" && <MaterialCommunityIcons name="palette" size={18} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                            {cat.name === "Workshop" && <Feather name="briefcase" size={16} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                            {cat.name === "Tech" && <Feather name="cpu" size={16} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                            {cat.name === "Food" && <Feather name="coffee" size={16} color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"} />}
+                        </View>
                         <ThemedText style={[
                             styles.categoryText,
                             selectedCategory === cat.name && styles.categoryTextActive
@@ -305,7 +339,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 ))}
             </ScrollView>
         </View>
-    ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard]);
+    ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard, isLoading]);
 
     return (
         <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
@@ -324,21 +358,19 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 refreshing={isFetching}
                 onRefresh={refetch}
                 ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                        {isLoading ? (
-                            <ActivityIndicator size="large" color="#7C3AED" />
-                        ) : (
-                            <>
-                                <Image
-                                    source={require("../../assets/images/icon.png")}
-                                    style={styles.emptyImage}
-                                    contentFit="contain"
-                                />
-                                <ThemedText style={styles.emptyTitle}>No Events Found</ThemedText>
-                                <ThemedText style={styles.emptySub}>Try searching for something else</ThemedText>
-                            </>
-                        )}
-                    </View>
+                    isLoading ? (
+                        <SecondarySkeleton />
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Image
+                                source={require("../../assets/images/icon.png")}
+                                style={styles.emptyImage}
+                                contentFit="contain"
+                            />
+                            <ThemedText style={styles.emptyTitle}>No Events Found</ThemedText>
+                            <ThemedText style={styles.emptySub}>Try searching for something else</ThemedText>
+                        </View>
+                    )
                 }
             />
         </ThemedView>
@@ -446,37 +478,41 @@ const styles = StyleSheet.create({
     },
     featuredList: {
         paddingHorizontal: Spacing.lg,
-        gap: Spacing.md,
+        gap: 16,
     },
     featuredCard: {
-        width: width * 0.82,
+        width: width * 0.85,
         backgroundColor: "#1F2937",
-        borderRadius: 28,
+        borderRadius: 40,
         overflow: "hidden",
         ...Shadows.lg,
+        padding: 12,
     },
     featuredImageContainer: {
         width: "100%",
-        height: 220,
+        height: width * 0.55,
+        borderRadius: 32,
+        overflow: "hidden",
     },
     featuredImage: {
         width: "100%",
         height: "100%",
     },
     featuredOverlayContent: {
-        padding: 16,
+        paddingTop: 16,
+        paddingHorizontal: 8,
     },
     featuredTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: "900",
         color: "#FFF",
-        marginBottom: 6,
+        marginBottom: 8,
     },
     featuredDetail: {
-        fontSize: 14,
+        fontSize: 15,
         color: "#7C3AED",
         fontWeight: "800",
-        marginBottom: 10,
+        marginBottom: 12,
     },
     featuredMetaRow: {
         flexDirection: "row",
@@ -486,11 +522,11 @@ const styles = StyleSheet.create({
     featuredInfoItem: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 6,
+        gap: 8,
         flex: 1,
     },
     featuredMetaText: {
-        fontSize: 13,
+        fontSize: 14,
         color: "#9CA3AF",
         fontWeight: "600",
     },
@@ -511,18 +547,24 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 24,
         backgroundColor: "transparent",
-        borderWidth: 1.5,
-        borderColor: "rgba(124, 58, 237, 0.4)",
+        borderWidth: 2,
+        borderColor: "#7C3AED",
         gap: 8,
     },
     categoryChipActive: {
         backgroundColor: "#7C3AED",
         borderColor: "#7C3AED",
     },
+    categoryBadgeIcon: {
+        width: 20,
+        height: 20,
+        justifyContent: "center",
+        alignItems: "center",
+    },
     categoryText: {
         fontSize: 14,
-        fontWeight: "700",
-        color: "#FFF",
+        fontWeight: "800",
+        color: "#7C3AED",
     },
     categoryTextActive: {
         color: "#FFF",
