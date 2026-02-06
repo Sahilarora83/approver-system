@@ -7,9 +7,10 @@ import { Feather, MaterialCommunityIcons, Ionicons, FontAwesome5 } from "@expo/v
 import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns";
 import Animated, { FadeInUp, FadeInRight, FadeInDown, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, interpolate } from "react-native-reanimated";
+
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import EventMap from "@/components/EventMap";
 
 import { apiRequest, resolveImageUrl, queryClient } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
@@ -361,31 +362,11 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     </View>
 
                     <View style={styles.mapContainer}>
-                        <MapView
-                            style={styles.map}
-                            provider={PROVIDER_GOOGLE}
-                            initialRegion={{
-                                latitude: parseFloat(event.latitude) || 40.7128,
-                                longitude: parseFloat(event.longitude) || -74.0060,
-                                latitudeDelta: 0.015,
-                                longitudeDelta: 0.015,
-                            }}
-                            customMapStyle={darkMapStyle}
-                        >
-                            <Marker
-                                coordinate={{
-                                    latitude: parseFloat(event.latitude) || 40.7128,
-                                    longitude: parseFloat(event.longitude) || -74.0060,
-                                }}
-                            >
-                                <View style={styles.markerContainer}>
-                                    <View style={styles.markerPulse} />
-                                    <View style={styles.markerCore}>
-                                        <Ionicons name="musical-notes" size={14} color="#FFF" />
-                                    </View>
-                                </View>
-                            </Marker>
-                        </MapView>
+                        <EventMap
+                            latitude={parseFloat(event.latitude) || 40.7128}
+                            longitude={parseFloat(event.longitude) || -74.0060}
+                            title={event.title}
+                        />
                     </View>
 
                     {/* More Events Like This */}
