@@ -1084,6 +1084,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Attendees & Following
+  app.get("/api/events/:id/attendees", async (req, res) => {
+    try {
+      const attendees = await storage.getEventAttendees(req.params.id, req.session.userId);
+      res.json(attendees);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get attendees" });
+    }
+  });
+
+  app.post("/api/users/:id/follow", requireAuth, async (req, res) => {
+    try {
+      await storage.followUser(req.session.userId!, req.params.id as string);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to follow user" });
+    }
+  });
+
+  app.delete("/api/users/:id/follow", requireAuth, async (req, res) => {
+    try {
+      await storage.unfollowUser(req.session.userId!, req.params.id as string);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unfollow user" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

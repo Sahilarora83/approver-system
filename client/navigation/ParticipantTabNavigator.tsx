@@ -17,11 +17,14 @@ import FavoritesScreen from "@/screens/FavoritesScreen";
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+import AttendeesScreen from "@/screens/AttendeesScreen";
+
 function DiscoverStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="DiscoverEvents" component={DiscoverEventsScreen} />
       <Stack.Screen name="ParticipantEventDetail" component={ParticipantEventDetailScreen} />
+      <Stack.Screen name="Attendees" component={AttendeesScreen} />
     </Stack.Navigator>
   );
 }

@@ -257,7 +257,13 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         <View style={styles.categoryBadge}>
                             <ThemedText style={styles.categoryText}>{event.category || "Music"}</ThemedText>
                         </View>
-                        <View style={styles.avatarPile}>
+                        <Pressable
+                            style={styles.avatarPile}
+                            onPress={() => navigation.navigate("Attendees", {
+                                eventId: event.id,
+                                count: attendanceData?.count || 0
+                            })}
+                        >
                             {(attendanceData?.registrations || []).slice(0, 4).map((reg: any, i: number) => (
                                 <Image
                                     key={i}
@@ -265,9 +271,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                     style={[styles.pileAvatar, { marginLeft: i === 0 ? 0 : -10 }]}
                                 />
                             ))}
-                            <ThemedText style={styles.attendanceText}>{attendanceData?.count || "20k+"} going</ThemedText>
+                            <ThemedText style={styles.attendanceText}>{attendanceData?.count?.toLocaleString() || "2k+"} going</ThemedText>
                             <Feather name="arrow-right" size={14} color={COLORS.primary} style={{ marginLeft: 4 }} />
-                        </View>
+                        </Pressable>
                     </View>
 
                     {/* Date & Location */}

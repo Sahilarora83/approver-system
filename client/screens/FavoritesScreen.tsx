@@ -104,25 +104,41 @@ export default function FavoritesScreen({ navigation }: any) {
                 columnWrapperStyle={styles.columnWrapper}
                 contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 20, paddingBottom: 100 }]}
                 renderItem={({ item, index }) => (
-                    <Animated.View entering={FadeInRight.delay(index * 100)} style={styles.cardContainer}>
+                    <Animated.View entering={FadeInRight.delay(index * 50).duration(500)} style={styles.cardContainer}>
                         <Pressable
                             style={styles.card}
                             onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
                         >
-                            <Image source={{ uri: resolveImageUrl(item.event.coverImage) }} style={styles.cardImage} />
-                            <View style={styles.priceBadge}>
-                                <ThemedText style={styles.priceText}>FREE</ThemedText>
+                            <View style={styles.cardImageContainer}>
+                                <Image
+                                    source={{ uri: resolveImageUrl(item.event.coverImage) }}
+                                    style={styles.cardImage}
+                                    contentFit="cover"
+                                />
+                                {(!item.event.price || item.event.price === "0" || item.event.price.toLowerCase() === "free") && (
+                                    <View style={styles.priceBadge}>
+                                        <ThemedText style={styles.priceText}>FREE</ThemedText>
+                                    </View>
+                                )}
                             </View>
                             <View style={styles.cardInfo}>
                                 <ThemedText style={styles.cardTitle} numberOfLines={1}>{item.event.title}</ThemedText>
                                 <ThemedText style={styles.cardTime}>
-                                    {format(new Date(item.event.startDate), "EEE, MMM d · h:mm a")}
+                                    {(() => {
+                                        try {
+                                            return format(new Date(item.event.startDate), "EEE, MMM d · hh:mm a");
+                                        } catch { return "TBD"; }
+                                    })()}
                                 </ThemedText>
                                 <View style={styles.locRow}>
-                                    <Feather name="map-pin" size={10} color="#9CA3AF" />
-                                    <ThemedText style={styles.locText} numberOfLines={1}>{item.event.location}</ThemedText>
+                                    <View style={styles.locInfo}>
+                                        <Feather name="map-pin" size={12} color="#7C3AED" />
+                                        <ThemedText style={styles.locText} numberOfLines={1}>
+                                            {item.event.location || "Online"}
+                                        </ThemedText>
+                                    </View>
                                     <Pressable style={styles.heartSmall}>
-                                        <MaterialCommunityIcons name="heart" size={14} color="#7C3AED" />
+                                        <MaterialCommunityIcons name="heart" size={16} color="#7C3AED" />
                                     </Pressable>
                                 </View>
                             </View>
@@ -166,15 +182,17 @@ const styles = StyleSheet.create({
     columnWrapper: { justifyContent: "space-between" },
     cardContainer: { width: "48%", marginBottom: 20 },
     card: { backgroundColor: "#1F2937", borderRadius: 24, overflow: "hidden", ...Shadows.md },
-    cardImage: { width: "100%", height: 140 },
+    cardImageContainer: { width: "100%", height: 140 },
+    cardImage: { width: "100%", height: "100%" },
     priceBadge: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(124, 58, 237, 0.9)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     priceText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
     cardInfo: { padding: 12, gap: 4 },
     cardTitle: { fontSize: 15, fontWeight: "800", color: "#FFF" },
     cardTime: { fontSize: 12, color: "#7C3AED", fontWeight: "700" },
-    locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+    locRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+    locInfo: { flexDirection: "row", alignItems: "center", gap: 4, flex: 1 },
     locText: { flex: 1, fontSize: 11, color: "#9CA3AF", fontWeight: "500" },
-    heartSmall: { width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center" },
+    heartSmall: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center" },
     emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 80, paddingHorizontal: 40 },
     iconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center", marginBottom: 24 },
     emptyTitle: { fontSize: 24, fontWeight: "900", color: "#FFF", textAlign: "center" },

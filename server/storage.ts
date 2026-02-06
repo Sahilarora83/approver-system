@@ -66,6 +66,8 @@ export interface IStorage {
   // Reviews
   getReviews(eventId: string): Promise<(Review & { user: User })[]>;
   createReview(data: Omit<Review, "id" | "createdAt">): Promise<Review>;
+
+  getEventAttendees(eventId: string, currentUserId?: string): Promise<(User & { isFollowing: boolean })[]>;
 }
 
 export class SupabaseStorage implements IStorage {
@@ -727,6 +729,49 @@ export class SupabaseStorage implements IStorage {
 
     if (error) throw new Error(error.message);
     return toCamelCase(review) as Review;
+  }
+
+  async getEventAttendees(eventId: string, currentUserId?: string): Promise<(User & { isFollowing: boolean })[]> {
+    // 1. Get all approved/checked_in registrations for the event
+    const { data: registrations, error: regError } = await supabase
+      .from('registrations')
+      .select('user_id, email, name')
+      .eq('event_id', eventId)
+      .in('status', ['approved', 'checked_in', 'checked_out']);
+
+    if (regError) throw new Error(regError.message);
+    if (!registrations || registrations.length === 0) return [];
+
+    // 2. Get user details for these registrations
+    const userIds = registrations.filter(r => r.user_id).map(r => r.user_id as string);
+    if (userIds.length === 0) return [];
+
+    const { data: usersData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', userIds);
+
+    if (userError) throw new Error(userError.message);
+
+    // 3. If currentUserId is provided, check follow status
+    let followingIds: string[] = [];
+    if (currentUserId) {
+      const { data: followData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', currentUserId);
+      if (followData) {
+        followingIds = followData.map(f => f.following_id);
+      }
+    }
+
+    return (usersData || []).map(u => {
+      const user = toCamelCase(u) as User;
+      return {
+        ...user,
+        isFollowing: followingIds.includes(u.id)
+      };
+    });
   }
 }
 

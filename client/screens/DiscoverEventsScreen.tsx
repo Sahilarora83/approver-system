@@ -29,12 +29,12 @@ const COLORS = {
 };
 
 const CATEGORIES = [
-    { name: "All", icon: "apps", lib: "MaterialCommunityIcons" },
-    { name: "Music", icon: "music-variant", lib: "MaterialCommunityIcons" },
-    { name: "Art", icon: "palette", lib: "MaterialCommunityIcons" },
-    { name: "Workshop", icon: "briefcase", lib: "MaterialCommunityIcons" },
-    { name: "Tech", icon: "laptop", lib: "MaterialCommunityIcons" },
-    { name: "Food", icon: "food-fork-drink", lib: "MaterialCommunityIcons" },
+    { name: "All", icon: "check-circle", lib: "Feather" },
+    { name: "Music", icon: "music", lib: "Feather" },
+    { name: "Art", icon: "image", lib: "Feather" },
+    { name: "Workshop", icon: "briefcase", lib: "Feather" },
+    { name: "Tech", icon: "cpu", lib: "Feather" },
+    { name: "Food", icon: "coffee", lib: "Feather" },
 ];
 
 export default function DiscoverEventsScreen({ navigation }: any) {
@@ -139,32 +139,26 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         transition={300}
                     />
                     <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.8)"]}
+                        colors={["transparent", "rgba(0,0,0,0.4)", "rgba(17, 24, 39, 0.9)"]}
                         style={StyleSheet.absoluteFill}
                     />
-                    <View style={styles.featuredTypeBadge}>
-                        <ThemedText style={styles.featuredTypeText}>LATEST</ThemedText>
-                    </View>
-                    <Pressable style={styles.featuredFavButton}>
-                        <Feather name="heart" size={20} color="#FFF" />
-                    </Pressable>
                 </View>
 
                 <View style={styles.featuredOverlayContent}>
                     <ThemedText style={styles.featuredTitle} numberOfLines={1}>{event.title}</ThemedText>
+                    <ThemedText style={styles.featuredDetail} numberOfLines={1}>
+                        {safeFormat(event.startDate, "EEE, MMM d • HH:mm")}
+                    </ThemedText>
                     <View style={styles.featuredMetaRow}>
                         <View style={styles.featuredInfoItem}>
-                            <Feather name="calendar" size={12} color="#7C3AED" />
-                            <ThemedText style={styles.featuredMetaText}>
-                                {safeFormat(event.startDate, "MMM d")} • {safeFormat(event.startDate, "HH:mm")}
-                            </ThemedText>
-                        </View>
-                        <View style={styles.featuredInfoItem}>
-                            <Feather name="map-pin" size={12} color="#7C3AED" />
+                            <Feather name="map-pin" size={14} color="#7C3AED" />
                             <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
                                 {event.location || "Online"}
                             </ThemedText>
                         </View>
+                        <Pressable style={styles.featuredInlineFav}>
+                            <Feather name="heart" size={20} color="#7C3AED" />
+                        </Pressable>
                     </View>
                 </View>
             </Pressable>
@@ -177,16 +171,34 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
                 style={styles.secondaryCard}
             >
-                <Image
-                    source={{ uri: resolveImageUrl(event.coverImage) }}
-                    style={styles.secondaryImage}
-                    contentFit="cover"
-                />
+                <View style={styles.secondaryImageContainer}>
+                    <Image
+                        source={{ uri: resolveImageUrl(event.coverImage) }}
+                        style={styles.secondaryImage}
+                        contentFit="cover"
+                    />
+                    {(!event.price || event.price === "0" || event.price.toLowerCase() === "free") && (
+                        <View style={styles.freeBadge}>
+                            <ThemedText style={styles.freeText}>FREE</ThemedText>
+                        </View>
+                    )}
+                </View>
                 <View style={styles.secondaryContent}>
                     <ThemedText style={styles.secondaryTitle} numberOfLines={1}>{event.title}</ThemedText>
-                    <ThemedText style={styles.secondaryDetail}>
-                        {safeFormat(event.startDate, "MMM d")} • {event.location || "TBD"}
+                    <ThemedText style={styles.secondaryDetail} numberOfLines={1}>
+                        {safeFormat(event.startDate, "EEE, MMM d • HH:mm")}
                     </ThemedText>
+                    <View style={styles.secondaryMetaRow}>
+                        <View style={styles.secondaryLocation}>
+                            <Feather name="map-pin" size={12} color="#7C3AED" />
+                            <ThemedText style={styles.secondaryLocationText} numberOfLines={1}>
+                                {event.location || "TBD"}
+                            </ThemedText>
+                        </View>
+                        <Pressable>
+                            <Feather name="heart" size={16} color="#7C3AED" />
+                        </Pressable>
+                    </View>
                 </View>
             </Pressable>
         </Animated.View>
@@ -272,11 +284,19 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                             selectedCategory === cat.name && styles.categoryChipActive
                         ]}
                     >
-                        <MaterialCommunityIcons
-                            name={cat.icon as any}
-                            size={18}
-                            color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"}
-                        />
+                        {cat.lib === "Feather" ? (
+                            <Feather
+                                name={cat.icon as any}
+                                size={16}
+                                color={selectedCategory === cat.name ? "#FFF" : "#FBBF24"}
+                            />
+                        ) : (
+                            <MaterialCommunityIcons
+                                name={cat.icon as any}
+                                size={18}
+                                color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"}
+                            />
+                        )}
                         <ThemedText style={[
                             styles.categoryText,
                             selectedCategory === cat.name && styles.categoryTextActive
@@ -328,7 +348,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#111827", // Dark theme like screenshot
+        backgroundColor: "#111827",
     },
     mainList: {
         paddingBottom: 20,
@@ -429,94 +449,52 @@ const styles = StyleSheet.create({
         gap: Spacing.md,
     },
     featuredCard: {
-        width: width * 0.75,
+        width: width * 0.82,
         backgroundColor: "#1F2937",
-        borderRadius: 32,
+        borderRadius: 28,
         overflow: "hidden",
         ...Shadows.lg,
     },
     featuredImageContainer: {
         width: "100%",
-        height: 200,
+        height: 220,
     },
     featuredImage: {
         width: "100%",
         height: "100%",
     },
-    featuredTypeBadge: {
-        position: "absolute",
-        top: 16,
-        left: 16,
-        backgroundColor: "#7C3AED",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
-        zIndex: 10,
-    },
-    featuredTypeText: {
-        color: "#FFF",
-        fontSize: 10,
-        fontWeight: "900",
-        letterSpacing: 1,
-    },
-    featuredFavButton: {
-        position: "absolute",
-        top: 16,
-        right: 16,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "rgba(0,0,0,0.3)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 10,
-    },
     featuredOverlayContent: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 20,
-        backgroundColor: "rgba(17, 24, 39, 0.6)",
+        padding: 16,
     },
     featuredTitle: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: "900",
         color: "#FFF",
-        marginBottom: 8,
+        marginBottom: 6,
+    },
+    featuredDetail: {
+        fontSize: 14,
+        color: "#7C3AED",
+        fontWeight: "800",
+        marginBottom: 10,
     },
     featuredMetaRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 16,
+        justifyContent: "space-between",
     },
     featuredInfoItem: {
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
+        flex: 1,
     },
     featuredMetaText: {
         fontSize: 13,
-        color: "#D1D5DB",
+        color: "#9CA3AF",
         fontWeight: "600",
     },
-    featuredFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 8,
-    },
-    featuredLocation: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        flex: 1,
-    },
-    featuredLocationText: {
-        fontSize: 13,
-        color: "#9CA3AF",
-    },
-    favButton: {
+    featuredInlineFav: {
         padding: 4,
     },
     categoryScroll: {
@@ -534,20 +512,17 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         backgroundColor: "transparent",
         borderWidth: 1.5,
-        borderColor: "#7C3AED",
+        borderColor: "rgba(124, 58, 237, 0.4)",
         gap: 8,
     },
     categoryChipActive: {
         backgroundColor: "#7C3AED",
         borderColor: "#7C3AED",
     },
-    categoryIcon: {
-        fontSize: 16,
-    },
     categoryText: {
         fontSize: 14,
         fontWeight: "700",
-        color: "#7C3AED",
+        color: "#FFF",
     },
     categoryTextActive: {
         color: "#FFF",
@@ -567,22 +542,58 @@ const styles = StyleSheet.create({
         overflow: "hidden",
         ...Shadows.sm,
     },
+    secondaryImageContainer: {
+        width: "100%",
+        height: 140,
+    },
     secondaryImage: {
         width: "100%",
-        height: 150,
+        height: "100%",
+    },
+    freeBadge: {
+        position: "absolute",
+        top: 10,
+        left: 10,
+        backgroundColor: "rgba(124, 58, 237, 0.9)",
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    freeText: {
+        color: "#FFF",
+        fontSize: 10,
+        fontWeight: "900",
     },
     secondaryContent: {
         padding: 12,
-        gap: 4,
+        gap: 2,
     },
     secondaryTitle: {
         fontSize: 15,
-        fontWeight: "800",
+        fontWeight: "900",
         color: "#FFF",
     },
     secondaryDetail: {
         fontSize: 12,
+        color: "#7C3AED",
+        fontWeight: "700",
+    },
+    secondaryMetaRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 6,
+    },
+    secondaryLocation: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        flex: 1,
+    },
+    secondaryLocationText: {
+        fontSize: 11,
         color: "#9CA3AF",
+        fontWeight: "500",
     },
     emptyState: {
         padding: 40,
@@ -604,13 +615,6 @@ const styles = StyleSheet.create({
     emptySub: {
         fontSize: 14,
         color: "#9CA3AF",
-        marginTop: 4,
-    },
-    locationSkeleton: {
-        width: 140,
-        height: 28,
-        backgroundColor: "rgba(255,255,255,0.1)",
-        borderRadius: 8,
         marginTop: 4,
     },
 });
