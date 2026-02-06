@@ -23,6 +23,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Colors } from "@/constants/theme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useLocalNotificationPoller } from "@/hooks/useLocalNotificationPoller";
+import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 import * as Notifications from "expo-notifications";
 
 SplashScreen.preventAutoHideAsync();
@@ -204,6 +205,7 @@ function LoadingScreen() {
 
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
+  useAutoUpdate();
 
   useEffect(() => {
     // IGNORE SPECIFIC EXPO NOTIFICATION LOGS
