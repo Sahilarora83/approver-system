@@ -15,6 +15,7 @@ import RootStackNavigator, { RootStackParamList } from "@/navigation/RootStackNa
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { FloatingNotification } from "@/components/FloatingNotification";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -207,7 +208,7 @@ function LoadingScreen() {
 
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
-  useAutoUpdate();
+  const { isUpdateAvailable, setIsUpdateAvailable } = useAutoUpdate();
 
   useEffect(() => {
     // IGNORE SPECIFIC EXPO NOTIFICATION LOGS
@@ -259,6 +260,10 @@ export default function App() {
               <SocketProvider>
                 <NotificationWrapper>
                   <AppWithKeyboard />
+                  <UpdatePrompt
+                    isVisible={isUpdateAvailable}
+                    onDismiss={() => setIsUpdateAvailable(false)}
+                  />
                 </NotificationWrapper>
               </SocketProvider>
             </AuthProvider>
