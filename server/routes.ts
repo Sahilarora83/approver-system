@@ -84,10 +84,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Helper to send batch push notifications via Expo
+  const sendExpoBatch = async (messages: any[]) => {
+    if (messages.length === 0) return;
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messages),
+      });
+      const resData = await response.json();
+      console.log(`[Push Batch] Sent ${messages.length} notifications. Response status: ${response.status}`);
+      return resData;
+    } catch (error) {
+      console.error("[Push Batch Error]", error);
+    }
+  };
+
   const notifyUser = async (userId: string, title: string, body: string, type: string, relatedId?: string) => {
     try {
       // 1. Save in DB for in-app Notifications Screen
-      await storage.createNotification({
+      const notification = await storage.createNotification({
         userId,
         title,
         body,
@@ -95,31 +116,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         relatedId: relatedId || null,
         read: false
       });
+
+      // Emit Real-time update via Socket.io
+      const io = (app as any).io;
+      if (io) {
+        io.to(`user:${userId}`).emit("notification-received", notification);
+      }
+
       console.log(`[Notification] To user ${userId}: ${title} - ${body}`);
 
       // 2. Send REAL Push Notification (Outside the app)
       const user = await storage.getUser(userId);
       if (user?.pushToken) {
-        console.log(`[Push] Sending to token: ${user.pushToken}`);
-        const response = await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Accept-encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: user.pushToken,
-            sound: 'default',
-            title: title,
-            body: body,
-            data: { relatedId, type },
-            priority: 'high',
-            channelId: 'default',
-          }),
-        });
-        const resData = await response.json();
-        console.log(`[Push] Expo Response:`, JSON.stringify(resData));
+        await sendExpoBatch([{
+          to: user.pushToken,
+          sound: 'default',
+          title: title,
+          body: body,
+          data: { relatedId, type },
+          priority: 'high',
+          channelId: 'default',
+        }]);
       }
     } catch (error) {
       console.error("[Notification Error]", error);
@@ -614,13 +631,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const participantIds = [...new Set([...explicitUserIds, ...guestUserIds])];
-      console.log(`[Broadcast] Identified ${participantIds.length} unique in-app participants to notify (${explicitUserIds.length} explicit, ${guestUserIds.length} resolved from guests)`);
+      console.log(`[Broadcast] Identified ${participantIds.length} unique in-app participants to notify`);
 
-      // 3. Notify Participants
-      await Promise.all(participantIds.map(async (userId) => {
-        console.log(`[Broadcast] Notifying user ${userId}`);
-        await notifyUser(userId, title || `Update: ${event.title}`, message, "broadcast", event.id);
-      }));
+      // 3. Optimized Notification Delivery (Chunked for memory/scaling)
+      const chunkSize = 100;
+      for (let i = 0; i < participantIds.length; i += chunkSize) {
+        const chunk = participantIds.slice(i, i + chunkSize);
+
+        // 3a. Bulk DB Create Notifications
+        const notificationsData = chunk.map(userId => ({
+          userId,
+          title: title || `Update: ${event.title}`,
+          body: message,
+          type: "broadcast",
+          relatedId: event.id,
+          read: false
+        }));
+        await storage.createNotificationsBulk(notificationsData);
+
+        // 3b. Socket Emit to everyone in the chunk
+        const io = (app as any).io;
+        if (io) {
+          chunk.forEach(userId => {
+            io.to(`user:${userId}`).emit("notification-received", { title, body: message, type: 'broadcast', relatedId: event.id });
+          });
+        }
+
+        // 3c. Batch Push Notifications
+        const pushMessages: any[] = [];
+        for (const userId of chunk) {
+          const user = await storage.getUser(userId);
+          if (user?.pushToken) {
+            pushMessages.push({
+              to: user.pushToken,
+              sound: 'default',
+              title: title || `Update: ${event.title}`,
+              body: message,
+              data: { relatedId: event.id, type: "broadcast" },
+              priority: 'high',
+            });
+          }
+        }
+        if (pushMessages.length > 0) {
+          await sendExpoBatch(pushMessages);
+        }
+      }
 
       // 4. Save history in DB
       console.log(`[Broadcast] Saving history to DB...`);

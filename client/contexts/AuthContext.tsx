@@ -97,20 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // Clear state immediately for instant UI response
+    // 1. Instant UI cleanup
     setUser(null);
     queryClient.clear();
 
-    // Secondary async cleanup
-    try {
-      await Promise.all([
-        AsyncStorage.removeItem("user"),
-        AsyncStorage.removeItem("token"),
-        apiRequest("POST", "/api/auth/logout", {}).catch(() => { }),
-      ]);
-    } catch (e) {
-      console.error("Cleanup error:", e);
-    }
+    // 2. Clear Storage immediately (synchronous-like speed)
+    await AsyncStorage.multiRemove(["user", "token"]);
+
+    // 3. Background API cleanup (don't wait for this to navigate)
+    apiRequest("POST", "/api/auth/logout", {}).catch(() => { });
+
+    console.log("[Auth] Logout complete (Optimistic)");
   }, []);
 
 

@@ -50,6 +50,7 @@ export interface IStorage {
   }>;
   getNotifications(userId: string): Promise<Notification[]>;
   createNotification(data: Omit<Notification, "id" | "createdAt">): Promise<Notification>;
+  createNotificationsBulk(data: Omit<Notification, "id" | "createdAt">[]): Promise<void>;
   markNotificationAsRead(id: string): Promise<void>;
   getFollowers(userId: string): Promise<string[]>;
   createBroadcast(data: { eventId: string; organizerId: string; title?: string; message: string }): Promise<void>;
@@ -553,6 +554,15 @@ export class SupabaseStorage implements IStorage {
 
     if (error) throw new Error(error.message);
     return toCamelCase(notification) as Notification;
+  }
+
+  async createNotificationsBulk(data: Omit<Notification, "id" | "createdAt">[]): Promise<void> {
+    if (data.length === 0) return;
+    const { error } = await supabase
+      .from('notifications')
+      .insert(toSnakeCase(data));
+
+    if (error) throw new Error(error.message);
   }
 
   async markNotificationAsRead(id: string): Promise<void> {

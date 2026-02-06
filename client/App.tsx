@@ -18,7 +18,7 @@ import { FloatingNotification } from "@/components/FloatingNotification";
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { SocketProvider } from "@/contexts/SocketContext";
+import { SocketProvider, useSocket } from "@/contexts/SocketContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors } from "@/constants/theme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -77,7 +77,10 @@ function NotificationWrapper({ children }: { children: React.ReactNode }) {
     const storedUser = user; // Use current user from AuthContext
 
     if (data.type === 'new_event' || data.type === 'broadcast') {
-      if (storedUser?.role === 'admin') {
+      const isUserAdmin = user?.role === 'admin';
+
+      if (isUserAdmin) {
+        // Admin goes to Event Management screen
         navigationRef.navigate('EventDetail', { eventId: data.relatedId });
       } else {
         // Participants use ParticipantEventDetail inside DiscoverStack
@@ -88,7 +91,6 @@ function NotificationWrapper({ children }: { children: React.ReactNode }) {
             params: { eventId: data.relatedId }
           }
         });
-
       }
     } else if (data.type?.startsWith('registration_') && data.relatedId) {
       navigationRef.navigate('TicketView', { registrationId: data.relatedId });
@@ -121,6 +123,29 @@ function NotificationWrapper({ children }: { children: React.ReactNode }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   });
+
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (socket) {
+      socket.on("notification-received", (notif: any) => {
+        console.log("[Socket] Notification received:", notif);
+        setActiveNotification({
+          title: notif.title,
+          body: notif.body,
+          data: { type: notif.type, relatedId: notif.relatedId },
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Invalidate queries to update notification list and counts
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user/stats"] });
+      });
+
+      return () => {
+        socket.off("notification-received");
+      };
+    }
+  }, [socket]);
 
   return (
     <>
