@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Location from 'expo-location';
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -14,9 +15,17 @@ import { format } from "date-fns";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { resolveImageUrl } from "@/lib/query-client";
 import Animated, { FadeInDown, FadeInRight, Layout } from "react-native-reanimated";
-import { Icon } from "@/components/Icon";
 
 const { width } = Dimensions.get("window");
+
+const CATEGORIES = [
+    { name: "All", icon: "grid" },
+    { name: "Music", icon: "music" },
+    { name: "Tech", icon: "cpu" },
+    { name: "Concert", icon: "mic" },
+    { name: "Design", icon: "layers" },
+    { name: "Social", icon: "users" },
+];
 
 export default function DiscoverEventsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
@@ -25,10 +34,35 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [userCity, setUserCity] = useState("California, USA");
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
     }) as { data: any[]; isLoading: boolean; refetch: any; isFetching: boolean };
+
+    // Real Location Detection
+    useEffect(() => {
+        (async () => {
+            try {
+                let { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted') return;
+
+                let location = await Location.getCurrentPositionAsync({});
+                let geocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+
+                if (geocode.length > 0) {
+                    const city = geocode[0].city || geocode[0].region || "Your Location";
+                    const country = geocode[0].country || "";
+                    setUserCity(`${city}${country ? ', ' + country : ''}`);
+                }
+            } catch (error) {
+                console.error("Location error", error);
+            }
+        })();
+    }, []);
 
     const safeFormat = (date: any, formatStr: string) => {
         try {
@@ -41,34 +75,28 @@ export default function DiscoverEventsScreen({ navigation }: any) {
         }
     };
 
-    const categories = [
-        { name: "All", icon: "grid" },
-        { name: "Music", icon: "music" },
-        { name: "Tech", icon: "cpu" },
-        { name: "Concert", icon: "mic" },
-        { name: "Design", icon: "layers" },
-        { name: "Social", icon: "users" },
-    ];
-
     const filteredEvents = useMemo(() => {
         return events.filter((event: any) => {
             if (!event || !event.title) return false;
+
             const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (event.description && event.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
             if (selectedCategory !== "All") {
-                const matchesCategory = (event.description && event.description.toLowerCase().includes(selectedCategory.toLowerCase())) ||
-                    event.title.toLowerCase().includes(selectedCategory.toLowerCase());
+                const categorySearch = selectedCategory.toLowerCase();
+                const matchesCategory =
+                    (event.category && event.category.toLowerCase().includes(categorySearch)) ||
+                    (event.description && event.description.toLowerCase().includes(categorySearch)) ||
+                    event.title.toLowerCase().includes(categorySearch);
                 return matchesSearch && matchesCategory;
             }
             return matchesSearch;
         });
     }, [events, searchQuery, selectedCategory]);
 
-    const upcomingEvents = useMemo(() => events.slice(0, 5), [events]);
-    const topPickEvents = useMemo(() => filteredEvents.slice(0, 10), [filteredEvents]);
+    const upcomingEvents = useMemo(() => events.slice(0, 8), [events]);
 
-    const renderUpcomingCard = ({ item: event, index }: { item: any, index: number }) => (
+    const renderUpcomingCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
         <Animated.View entering={FadeInRight.delay(index * 100).duration(500)}>
             <Pressable
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
@@ -78,24 +106,33 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     Shadows.md
                 ]}
             >
-                <Image
-                    source={{ uri: resolveImageUrl(event.coverImage) }}
-                    style={styles.upcomingImage}
-                    contentFit="cover"
-                />
+                <View style={styles.upcomingImageWrapper}>
+                    <Image
+                        source={{ uri: resolveImageUrl(event.coverImage) }}
+                        style={styles.upcomingImage}
+                        contentFit="cover"
+                        transition={300}
+                    />
+                    <LinearGradient
+                        colors={["transparent", "rgba(0,0,0,0.4)"]}
+                        style={StyleSheet.absoluteFill}
+                    />
+                </View>
                 <View style={styles.upcomingInfo}>
-                    <ThemedText style={styles.upcomingDate}>{safeFormat(event.startDate, "d MMM, yyyy")}</ThemedText>
-                    <ThemedText type="h4" numberOfLines={2} style={styles.upcomingTitle}>{event.title}</ThemedText>
+                    <ThemedText style={styles.upcomingDate}>{safeFormat(event.startDate, "d MMM")}</ThemedText>
+                    <ThemedText type="h4" numberOfLines={1} style={styles.upcomingTitle}>{event.title}</ThemedText>
                     <View style={styles.upcomingLocation}>
-                        <Feather name="map-pin" size={12} color={theme.textSecondary} />
-                        <ThemedText style={styles.upcomingLocationText} numberOfLines={1}>{event.location || "California, USA"}</ThemedText>
+                        <Feather name="map-pin" size={10} color={theme.textSecondary} />
+                        <ThemedText style={styles.upcomingLocationText} numberOfLines={1}>
+                            {event.location || "Nearby"}
+                        </ThemedText>
                     </View>
                 </View>
             </Pressable>
         </Animated.View>
-    );
+    ), [theme, navigation]);
 
-    const renderLargeCard = ({ item: event, index }: { item: any, index: number }) => (
+    const renderLargeCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
         <Animated.View entering={FadeInDown.delay(index * 100).duration(600)}>
             <Pressable
                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: event.id })}
@@ -114,8 +151,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     style={styles.largeOverlay}
                 />
                 <View style={styles.largeContent}>
-                    <View>
-                        <ThemedText style={styles.largeDate}>{safeFormat(event.startDate, "d MMM yyyy")}</ThemedText>
+                    <View style={{ flex: 1 }}>
+                        <ThemedText style={styles.largeDate}>{safeFormat(event.startDate, "EEEE, d MMM yyyy")}</ThemedText>
                         <ThemedText type="h3" style={styles.largeTitle}>{event.title}</ThemedText>
                     </View>
                     <View style={styles.actionIcon}>
@@ -124,13 +161,13 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 </View>
             </Pressable>
         </Animated.View>
-    );
+    ), [navigation]);
 
-    const ListHeader = () => (
+    // Refactored Header to prevent re-renders on every keystroke
+    const ListHeader = useMemo(() => (
         <View>
-            {/* Header Block with Gradient */}
             <LinearGradient
-                colors={["#A855F7", "#EC4899"]} // Deep Purple to Pinkish
+                colors={["#A855F7", "#EC4899"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.headerGradient, { paddingTop: insets.top + Spacing.lg }]}
@@ -141,7 +178,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                             <Feather name="compass" size={14} color="rgba(255,255,255,0.8)" />
                             <ThemedText style={styles.locationLabel}>Events near me</ThemedText>
                         </View>
-                        <ThemedText style={styles.locationTitle}>California, USA</ThemedText>
+                        <ThemedText style={styles.locationTitle}>{userCity}</ThemedText>
                     </View>
                     <Pressable
                         onPress={() => navigation.navigate("Notifications")}
@@ -156,14 +193,13 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 </View>
             </LinearGradient>
 
-            {/* Overlapping Search Bar */}
             <View style={styles.searchWrapper}>
                 <View style={[styles.searchInputContainer, Shadows.lg]}>
                     <Feather name="search" size={20} color={theme.textSecondary} />
                     <TextInput
-                        style={styles.searchInput}
+                        style={[styles.searchInput, { color: '#111' }]}
                         placeholder="Search events"
-                        placeholderTextColor={theme.textSecondary + "90"}
+                        placeholderTextColor="#999"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
@@ -173,10 +209,10 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 </View>
             </View>
 
-            {/* Upcoming Events Section */}
             <View style={styles.sectionHeader}>
                 <ThemedText type="h2" style={styles.sectionTitle}>Upcoming Events</ThemedText>
             </View>
+
             <FlatList
                 horizontal
                 data={upcomingEvents}
@@ -184,11 +220,10 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 keyExtractor={(item) => `upcoming-${item.id}`}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.upcomingList}
-                snapToInterval={width * 0.7 + Spacing.lg}
+                snapToInterval={width * 0.55 + Spacing.lg}
                 decelerationRate="fast"
             />
 
-            {/* Top Picks Section */}
             <View style={styles.sectionHeaderWithAction}>
                 <ThemedText type="h2" style={styles.sectionTitle}>Top Picks 🔥</ThemedText>
                 <Pressable>
@@ -196,13 +231,12 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 </Pressable>
             </View>
 
-            {/* Category Chips */}
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoryList}
             >
-                {categories.map((cat) => (
+                {CATEGORIES.map((cat) => (
                     <Pressable
                         key={cat.name}
                         onPress={() => {
@@ -236,12 +270,12 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 ))}
             </ScrollView>
         </View>
-    );
+    ), [userCity, insets.top, navigation, theme, searchQuery, selectedCategory, upcomingEvents, renderUpcomingCard]);
 
     return (
         <ThemedView style={styles.container}>
             <FlatList
-                data={topPickEvents}
+                data={filteredEvents}
                 renderItem={renderLargeCard}
                 keyExtractor={(item) => `pick-${item.id}`}
                 ListHeaderComponent={ListHeader}
@@ -263,7 +297,11 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                                 </ThemedText>
                             </>
                         )}
-                        {isLoading && <ActivityIndicator color={theme.primary} size="large" />}
+                        {isLoading && (
+                            <View style={{ marginTop: 40 }}>
+                                <ActivityIndicator color={theme.primary} size="large" />
+                            </View>
+                        )}
                     </View>
                 }
             />
@@ -297,7 +335,7 @@ const styles = StyleSheet.create({
         fontWeight: "500",
     },
     locationTitle: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: "800",
         color: "#FFF",
         marginTop: 4,
@@ -338,8 +376,8 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 16,
-        color: "#111",
         fontWeight: "500",
+        paddingVertical: 10,
     },
     filterButton: {
         width: 40,
@@ -378,31 +416,36 @@ const styles = StyleSheet.create({
         gap: Spacing.lg,
     },
     upcomingCard: {
-        width: width * 0.7,
-        borderRadius: 24,
-        padding: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
+        width: width * 0.55,
+        borderRadius: 20,
+        overflow: 'hidden',
+        padding: 8,
+        gap: 8,
+    },
+    upcomingImageWrapper: {
+        width: '100%',
+        height: 120,
+        borderRadius: 16,
+        overflow: 'hidden',
     },
     upcomingImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 18,
+        width: '100%',
+        height: '100%',
     },
     upcomingInfo: {
-        flex: 1,
-        gap: 4,
+        paddingHorizontal: 4,
+        gap: 2,
     },
     upcomingDate: {
         fontSize: 12,
         color: "#9333EA",
         fontWeight: "700",
+        textTransform: 'uppercase',
     },
     upcomingTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: "700",
-        lineHeight: 20,
+        lineHeight: 18,
     },
     upcomingLocation: {
         flexDirection: "row",
@@ -410,7 +453,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     upcomingLocationText: {
-        fontSize: 12,
+        fontSize: 11,
         color: "#6B7280",
     },
     categoryList: {
@@ -474,9 +517,8 @@ const styles = StyleSheet.create({
     },
     largeTitle: {
         color: "#FFF",
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: "800",
-        maxWidth: "80%",
     },
     actionIcon: {
         width: 50,
@@ -494,4 +536,5 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 });
+
 
