@@ -156,15 +156,27 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         navigation.navigate("RegisterEvent", { eventLink: event.publicLink || event.public_link });
     };
 
-    if (isLoading || !event) {
+    if (isLoading) {
         return (
             <ThemedView style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
             </ThemedView>
-        );
+        )
     }
 
-    const gallery = event.gallery || [event.coverImage];
+    if (!event) {
+        return (
+            <ThemedView style={styles.loadingContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+                <ThemedText style={{ marginTop: 12, fontSize: 18, fontWeight: "700" }}>Event not found</ThemedText>
+                <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: COLORS.primary, borderRadius: 12 }}>
+                    <ThemedText style={{ color: "#FFF", fontWeight: "800" }}>Go Back</ThemedText>
+                </Pressable>
+            </ThemedView>
+        )
+    }
+
+    const gallery = (Array.isArray(event.gallery) && event.gallery.length > 0) ? event.gallery : [event.coverImage];
 
     return (
         <ThemedView style={styles.container}>
