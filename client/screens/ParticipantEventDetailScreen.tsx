@@ -169,9 +169,14 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 <View style={styles.content}>
                     <View style={styles.headerRow}>
                         <ThemedText style={styles.title}>{event.title}</ThemedText>
-                        <Pressable style={styles.actionIcon} onPress={() => setShowShareModal(true)}>
-                            <Feather name="share-2" size={24} color="#FFF" />
-                        </Pressable>
+                        <View style={styles.headerActions}>
+                            <Pressable style={styles.actionIcon} onPress={() => setShowShareModal(true)}>
+                                <Feather name="share-2" size={20} color="#FFF" />
+                            </Pressable>
+                            <Pressable style={[styles.actionIcon, { marginLeft: 12 }]}>
+                                <Feather name="heart" size={20} color={COLORS.primary} />
+                            </Pressable>
+                        </View>
                     </View>
 
                     <View style={styles.categoryInfo}>
@@ -213,8 +218,18 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                             <View style={{ flex: 1 }}>
                                 <ThemedText style={styles.infoLabel}>{event.location || "Online"}</ThemedText>
                                 <ThemedText style={styles.infoSub} numberOfLines={1}>{event.address || "New York, USA"}</ThemedText>
-                                <Pressable style={styles.linkButton}>
-                                    <ThemedText style={styles.linkText}>See Location on Maps</ThemedText>
+                                <Pressable
+                                    style={styles.linkButton}
+                                    onPress={() => {
+                                        const query = encodeURIComponent(event.address || event.location || "New York");
+                                        const url = Platform.select({
+                                            ios: `maps://app?q=${query}`,
+                                            android: `geo:0,0?q=${query}`
+                                        });
+                                        if (url) Linking.openURL(url);
+                                    }}
+                                >
+                                    <ThemedText style={styles.linkText}>View on Maps</ThemedText>
                                 </Pressable>
                             </View>
                         </View>
@@ -258,10 +273,10 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
             {/* Back Button Floating */}
             <Pressable
-                style={[styles.floatingBack, { top: insets.top + 10 }]}
                 onPress={() => navigation.goBack()}
+                style={[styles.floatingBack, { top: insets.top + 10 }]}
             >
-                <Feather name="arrow-left" size={24} color="#FFF" />
+                <Feather name="chevron-left" size={28} color="#FFF" />
             </Pressable>
 
             {/* Bottom Button */}
@@ -325,8 +340,9 @@ const styles = StyleSheet.create({
     imageOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, height: 150 },
     content: { marginTop: -30, backgroundColor: COLORS.background, borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, paddingTop: 30 },
     headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-    title: { fontSize: 28, fontWeight: "800", color: COLORS.text, flex: 1, marginRight: 16 },
-    actionIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.05)", justifyContent: "center", alignItems: "center" },
+    headerActions: { flexDirection: "row", alignItems: "center" },
+    title: { fontSize: 28, fontWeight: "900", color: COLORS.text, flex: 1, marginRight: 16, letterSpacing: -0.5 },
+    actionIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
     categoryInfo: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
     categoryBadge: { backgroundColor: "rgba(124, 58, 237, 0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
     categoryText: { color: COLORS.primary, fontSize: 12, fontWeight: "bold" },
@@ -336,13 +352,13 @@ const styles = StyleSheet.create({
     infoSection: { marginTop: 32, gap: 24 },
     infoRow: { flexDirection: "row", gap: 16, alignItems: "flex-start" },
     iconCircle: { width: 48, height: 48, borderRadius: 16, backgroundColor: "rgba(124, 58, 237, 0.1)", justifyContent: "center", alignItems: "center" },
-    infoLabel: { fontSize: 16, fontWeight: "700", color: COLORS.text },
-    infoSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+    infoLabel: { fontSize: 16, fontWeight: "700", color: COLORS.text, letterSpacing: 0.2 },
+    infoSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4, fontWeight: "500" },
     linkButton: { marginTop: 6 },
-    linkText: { color: COLORS.primary, fontSize: 13, fontWeight: "bold" },
-    sectionHeader: { marginTop: 32, marginBottom: 16 },
-    sectionTitle: { fontSize: 20, fontWeight: "800", color: COLORS.text },
-    description: { fontSize: 15, lineHeight: 24, color: COLORS.textSecondary },
+    linkText: { color: COLORS.primary, fontSize: 13, fontWeight: "800" },
+    sectionHeader: { marginTop: 32, marginBottom: 12 },
+    sectionTitle: { fontSize: 20, fontWeight: "900", color: COLORS.text, letterSpacing: -0.2 },
+    description: { fontSize: 15, lineHeight: 24, color: COLORS.textSecondary, fontWeight: "400" },
     readMore: { color: COLORS.primary, fontWeight: "bold" },
     organizerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(255,255,255,0.03)", padding: 16, borderRadius: 20 },
     organizerInfo: { flexDirection: "row", alignItems: "center", gap: 12 },

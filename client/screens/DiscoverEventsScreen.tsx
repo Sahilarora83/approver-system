@@ -19,13 +19,22 @@ import Animated, { FadeInDown, FadeInRight, FadeInUp } from "react-native-reanim
 
 const { width } = Dimensions.get("window");
 
+const COLORS = {
+    background: "#111827",
+    card: "#1F2937",
+    primary: "#7C3AED",
+    text: "#FFFFFF",
+    textSecondary: "#9CA3AF",
+    accent: "#10B981",
+};
+
 const CATEGORIES = [
-    { name: "All", icon: "✅" },
-    { name: "Music", icon: "🎵" },
-    { name: "Art", icon: "🎨" },
-    { name: "Workshop", icon: "💼" },
-    { name: "Tech", icon: "💻" },
-    { name: "Food", icon: "🍔" },
+    { name: "All", icon: "apps", lib: "MaterialCommunityIcons" },
+    { name: "Music", icon: "music-variant", lib: "MaterialCommunityIcons" },
+    { name: "Art", icon: "palette", lib: "MaterialCommunityIcons" },
+    { name: "Workshop", icon: "briefcase", lib: "MaterialCommunityIcons" },
+    { name: "Tech", icon: "laptop", lib: "MaterialCommunityIcons" },
+    { name: "Food", icon: "food-fork-drink", lib: "MaterialCommunityIcons" },
 ];
 
 export default function DiscoverEventsScreen({ navigation }: any) {
@@ -129,25 +138,33 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         contentFit="cover"
                         transition={300}
                     />
+                    <LinearGradient
+                        colors={["transparent", "rgba(0,0,0,0.8)"]}
+                        style={StyleSheet.absoluteFill}
+                    />
                     <View style={styles.featuredTypeBadge}>
-                        <ThemedText style={styles.featuredTypeText}>Featured</ThemedText>
+                        <ThemedText style={styles.featuredTypeText}>LATEST</ThemedText>
                     </View>
+                    <Pressable style={styles.featuredFavButton}>
+                        <Feather name="heart" size={20} color="#FFF" />
+                    </Pressable>
                 </View>
-                <View style={styles.featuredContent}>
+
+                <View style={styles.featuredOverlayContent}>
                     <ThemedText style={styles.featuredTitle} numberOfLines={1}>{event.title}</ThemedText>
-                    <ThemedText style={styles.featuredDate}>
-                        {safeFormat(event.startDate, "EEE, MMM d")} • {safeFormat(event.startDate, "HH:mm")}
-                    </ThemedText>
-                    <View style={styles.featuredFooter}>
-                        <View style={styles.featuredLocation}>
-                            <Feather name="map-pin" size={14} color="#7C3AED" />
-                            <ThemedText style={styles.featuredLocationText} numberOfLines={1}>
+                    <View style={styles.featuredMetaRow}>
+                        <View style={styles.featuredInfoItem}>
+                            <Feather name="calendar" size={12} color="#7C3AED" />
+                            <ThemedText style={styles.featuredMetaText}>
+                                {safeFormat(event.startDate, "MMM d")} • {safeFormat(event.startDate, "HH:mm")}
+                            </ThemedText>
+                        </View>
+                        <View style={styles.featuredInfoItem}>
+                            <Feather name="map-pin" size={12} color="#7C3AED" />
+                            <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
                                 {event.location || "Online"}
                             </ThemedText>
                         </View>
-                        <Pressable style={styles.favButton}>
-                            <Feather name="heart" size={18} color="#7C3AED" />
-                        </Pressable>
                     </View>
                 </View>
             </Pressable>
@@ -255,7 +272,11 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                             selectedCategory === cat.name && styles.categoryChipActive
                         ]}
                     >
-                        <ThemedText style={styles.categoryIcon}>{cat.icon}</ThemedText>
+                        <MaterialCommunityIcons
+                            name={cat.icon as any}
+                            size={18}
+                            color={selectedCategory === cat.name ? "#FFF" : "#7C3AED"}
+                        />
                         <ThemedText style={[
                             styles.categoryText,
                             selectedCategory === cat.name && styles.categoryTextActive
@@ -426,28 +447,57 @@ const styles = StyleSheet.create({
         position: "absolute",
         top: 16,
         left: 16,
-        backgroundColor: "rgba(124, 58, 237, 0.8)",
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
+        backgroundColor: "#7C3AED",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        zIndex: 10,
     },
     featuredTypeText: {
         color: "#FFF",
         fontSize: 10,
-        fontWeight: "bold",
+        fontWeight: "900",
+        letterSpacing: 1,
     },
-    featuredContent: {
+    featuredFavButton: {
+        position: "absolute",
+        top: 16,
+        right: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "rgba(0,0,0,0.3)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 10,
+    },
+    featuredOverlayContent: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
         padding: 20,
-        gap: 6,
+        backgroundColor: "rgba(17, 24, 39, 0.6)",
     },
     featuredTitle: {
-        fontSize: 18,
-        fontWeight: "800",
+        fontSize: 22,
+        fontWeight: "900",
         color: "#FFF",
+        marginBottom: 8,
     },
-    featuredDate: {
+    featuredMetaRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+    },
+    featuredInfoItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    featuredMetaText: {
         fontSize: 13,
-        color: "#7C3AED",
+        color: "#D1D5DB",
         fontWeight: "600",
     },
     featuredFooter: {
