@@ -188,15 +188,15 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         <ThemedText style={styles.greetingText}>{greeting}</ThemedText>
                         <ThemedText style={styles.userName}>{user?.name || "Andrew Ainsley"}</ThemedText>
                     </View>
-                </View >
+                </View>
                 <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.iconButton}>
                     <Feather name="bell" size={24} color="#FFF" />
                     <View style={styles.notifBadge} />
                 </Pressable>
-            </View >
+            </View>
 
             {/* Search Bar */}
-            < View style={styles.searchBarContainer} >
+            <View style={styles.searchBarContainer}>
                 <View style={styles.searchBar}>
                     <Feather name="search" size={20} color="#6B7280" />
                     <TextInput
@@ -210,15 +210,15 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         <MaterialCommunityIcons name="tune-variant" size={20} color="#7C3AED" />
                     </Pressable>
                 </View>
-            </View >
+            </View>
 
             {/* Featured Section */}
-            < View style={styles.sectionTitleRow} >
+            <View style={styles.sectionTitleRow}>
                 <ThemedText style={styles.sectionTitleMain}>Featured</ThemedText>
                 <Pressable onPress={() => { }}>
                     <ThemedText style={styles.seeAllText}>See All</ThemedText>
                 </Pressable>
-            </View >
+            </View>
             <FlatList
                 horizontal
                 data={featuredEvents}
@@ -263,7 +263,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     </Pressable>
                 ))}
             </ScrollView>
-        </View >
+        </View>
     ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard]);
 
     return (
