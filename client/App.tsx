@@ -14,6 +14,7 @@ import { queryClient } from "@/lib/query-client";
 import RootStackNavigator, { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { FloatingNotification } from "@/components/FloatingNotification";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -169,6 +170,7 @@ function NotificationWrapper({ children }: { children: React.ReactNode }) {
 function AppContent() {
   return (
     <GestureHandlerRootView style={styles.root}>
+      <ConnectionStatus />
       <NavigationContainer linking={linking} ref={navigationRef}>
         <RootStackNavigator />
       </NavigationContainer>

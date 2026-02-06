@@ -5,15 +5,17 @@ import { getApiUrl } from '@/lib/query-client';
 
 interface SocketContextType {
     socket: Socket | null;
+    isConnected: boolean;
 }
 
-const SocketContext = createContext<SocketContextType>({ socket: null });
+const SocketContext = createContext<SocketContextType>({ socket: null, isConnected: false });
 
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const socketRef = useRef<Socket | null>(null);
+    const [isConnected, setIsConnected] = React.useState(false);
 
     useEffect(() => {
         if (user?.id) {
@@ -28,10 +30,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
             socketRef.current.on('connect', () => {
                 console.log('[Socket] Connected');
+                setIsConnected(true);
             });
 
             socketRef.current.on('disconnect', () => {
                 console.log('[Socket] Disconnected');
+                setIsConnected(false);
             });
 
             return () => {
@@ -40,11 +44,13 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
                     socketRef.current = null;
                 }
             };
+        } else {
+            setIsConnected(false);
         }
     }, [user?.id]);
 
     return (
-        <SocketContext.Provider value={{ socket: socketRef.current }}>
+        <SocketContext.Provider value={{ socket: socketRef.current, isConnected }}>
             {children}
         </SocketContext.Provider>
     );
