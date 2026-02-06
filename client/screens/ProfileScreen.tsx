@@ -1,27 +1,31 @@
-import React, { useCallback, memo, useLayoutEffect, useEffect } from "react";
-import { StyleSheet, View, Pressable, ScrollView, Dimensions, Platform, Image } from "react-native";
+import React, { useCallback, useLayoutEffect, useMemo } from "react";
+import { StyleSheet, View, Pressable, ScrollView, Dimensions, Platform, Image, Share, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Icon, IconName } from "@/components/Icon";
+import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient, getApiUrl, resolveImageUrl } from "@/lib/query-client";
+import { apiRequest, resolveImageUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
-import { navigationRef } from "@/App";
+import Animated, { FadeInUp, FadeInRight, FadeInDown, useSharedValue, useAnimatedStyle, withSpring, interpolate, useAnimatedScrollHandler } from "react-native-reanimated";
+import { BlurView } from "expo-blur";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
+const COVER_HEIGHT = 280;
 
 type MenuItem = {
-  icon: IconName;
+  icon: any;
+  lib: "Feather" | "Ionicons" | "Material";
   label: string;
   onPress: () => void;
   badge?: string;
-  color?: string;
+  description?: string;
 };
 
 const MenuRow = ({ item, isLast, theme }: { item: MenuItem; isLast: boolean; theme: any }) => (
@@ -35,30 +39,35 @@ const MenuRow = ({ item, isLast, theme }: { item: MenuItem; isLast: boolean; the
       {
         opacity: pressed ? 0.7 : 1,
         borderBottomWidth: isLast ? 0 : 1,
-        borderBottomColor: theme.border,
+        borderBottomColor: "rgba(255,255,255,0.05)",
       }
     ]}
   >
-    <View style={[styles.iconBox, { backgroundColor: item.color || `${theme.primary}15` }]}>
-      <Icon name={item.icon} size={20} color={item.color ? '#fff' : theme.primary} />
+    <View style={styles.menuIconBox}>
+      {item.lib === "Feather" && <Feather name={item.icon} size={20} color="#7C3AED" />}
+      {item.lib === "Ionicons" && <Ionicons name={item.icon} size={20} color="#7C3AED" />}
+      {item.lib === "Material" && <MaterialCommunityIcons name={item.icon} size={22} color="#7C3AED" />}
     </View>
     <View style={styles.menuTextContainer}>
-      <ThemedText type="body" style={{ fontSize: 16, fontWeight: '500' }}>{item.label}</ThemedText>
+      <ThemedText style={styles.menuLabel}>{item.label}</ThemedText>
+      {item.description && (
+        <ThemedText style={styles.menuDescription}>{item.description}</ThemedText>
+      )}
     </View>
     {item.badge && (
-      <View style={[styles.badge, { backgroundColor: theme.error }]}>
-        <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{item.badge}</ThemedText>
+      <View style={styles.menuBadge}>
+        <ThemedText style={styles.menuBadgeText}>{item.badge}</ThemedText>
       </View>
     )}
-    <Icon name="chevron-right" size={16} color={theme.textSecondary} />
+    <Feather name="chevron-right" size={16} color="#4B5563" />
   </Pressable>
 );
 
 export default function ProfileScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-  const { theme } = useTheme();
   const { user, logout, refreshUser } = useAuth();
+  const scrollY = useSharedValue(0);
 
   const { data: stats, isLoading: isStatsLoading } = useQuery({
     queryKey: ["userStats", user?.id],
@@ -67,313 +76,300 @@ export default function ProfileScreen({ navigation }: any) {
       return res.json();
     },
     enabled: !!user,
-    staleTime: 30000, // Reduced staleTime for better sync while keeping cache benefits
   });
 
-  // Background refresh when screen comes into focus without blocking UI
   useFocusEffect(
     useCallback(() => {
       if (user) refreshUser();
     }, [refreshUser])
   );
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, [navigation]);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
 
-  const handleLogout = useCallback(async () => {
-    // Instant feedback
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    // This updates the global 'user' state to null, 
-    // which triggers RootStackNavigator to show LoginScreen instantly.
-    logout();
-  }, [logout]);
+  const coverAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(scrollY.value, [-100, 0], [1.2, 1], "clamp");
+    return { transform: [{ scale }] };
+  });
 
+  const profileCardAnimatedStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(scrollY.value, [0, 100], [0, -40], "clamp");
+    return { transform: [{ translateY }] };
+  });
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "admin": return "Organizer";
-      case "participant": return "Participant";
-      case "verifier": return "Verifier";
-      case "guest": return "Guest";
-      default: return role;
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out my profile on QR Ticket Manager!`,
+        url: `https://qrticket.app/user/${user?.id}`,
+      });
+    } catch (error) {
+      console.error(error);
     }
   };
 
   const accountItems: MenuItem[] = [
-    { icon: "user", label: "Edit Profile", onPress: () => navigation.navigate("EditProfile") },
-    { icon: "settings", label: "Settings", onPress: () => navigation.navigate("Settings") },
+    { icon: "user", lib: "Feather", label: "Edit Profile", description: "Name, bio, and profile image", onPress: () => navigation.navigate("EditProfile") },
     {
-      icon: "bell",
+      icon: "notifications",
+      lib: "Ionicons",
       label: "Notifications",
+      description: "Manage your alerts and news",
       onPress: () => navigation.navigate("Notifications"),
       badge: stats?.unreadNotifications > 0 ? String(stats.unreadNotifications) : undefined
     },
+    { icon: "heart", lib: "Feather", label: "Favorites", description: "Events you've saved", onPress: () => navigation.navigate("Favorites") },
+    { icon: "settings", lib: "Feather", label: "Settings", description: "Privacy and app preferences", onPress: () => navigation.navigate("Settings") },
   ];
 
   const supportItems: MenuItem[] = [
-    { icon: "help-circle", label: "Help Center", onPress: () => navigation.navigate("HelpCenter") },
-    { icon: "info", label: "About App", onPress: () => navigation.navigate("AboutApp") },
-    { icon: "shield", label: "Privacy Policy", onPress: () => navigation.navigate("PrivacyPolicy") },
+    { icon: "help-circle", lib: "Feather", label: "Help Center", onPress: () => navigation.navigate("HelpCenter") },
+    { icon: "shield-checkmark", lib: "Ionicons", label: "Privacy Policy", onPress: () => navigation.navigate("PrivacyPolicy") },
+    { icon: "information-circle", lib: "Ionicons", label: "About QR Ticket", onPress: () => navigation.navigate("AboutApp") },
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + Spacing.lg,
-          paddingBottom: tabBarHeight + Spacing.xl,
-          paddingHorizontal: Spacing.lg,
-        }}
+    <ThemedView style={styles.container}>
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 40 }}
       >
-        {/* Header Title */}
-        <View style={styles.headerTitleRow}>
-          <ThemedText type="h1" style={{ fontSize: 32 }}>Profile</ThemedText>
-          {/* Optional Top Actions could go here */}
+        {/* Immersive Cover */}
+        <View style={styles.coverWrapper}>
+          <Animated.View style={[styles.coverContainer, coverAnimatedStyle]}>
+            <Image
+              source={{ uri: user?.profileImage ? resolveImageUrl(user.profileImage) : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070&auto=format&fit=crop" }}
+              style={styles.coverImage}
+            />
+            <LinearGradient
+              colors={["rgba(17, 24, 39, 0.4)", "rgba(17, 24, 39, 0.95)"]}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
         </View>
 
-        {/* User Identity Card */}
-        <View style={[styles.identityCard, { backgroundColor: 'transparent' }]}>
-          <View style={[styles.avatarContainer, { borderColor: theme.primary }]}>
-            {/* ROBUST IMAGE RESOLVER (Matches EditProfile pattern) */}
-            <View style={styles.avatarWrapperInner}>
+        {/* Profile Card Overlay */}
+        <Animated.View style={[styles.profileCard, profileCardAnimatedStyle]}>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarBorder}>
               <Image
                 source={{
                   uri: user?.profileImage
-                    ? `${resolveImageUrl(user.profileImage)}?t=${new Date().getTime()}`
+                    ? resolveImageUrl(user.profileImage)
                     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || 'guest'}`
                 }}
-                style={styles.avatarImage}
-                resizeMode="cover"
-                onError={(e) => console.log("[Profile Image] Load Error:", e.nativeEvent.error)}
+                style={styles.avatar}
               />
+              {user?.role === 'admin' && (
+                <View style={styles.verifiedBadge}>
+                  <MaterialCommunityIcons name="check-decagram" size={20} color="#7C3AED" />
+                </View>
+              )}
             </View>
-            {user?.role === 'admin' && (
-              <View style={styles.verifiedBadge}>
-                <Icon name="check" size={10} color="#fff" />
-              </View>
+            <View style={styles.actionHeaderButtons}>
+              <Pressable style={styles.headerIconButton} onPress={handleShare}>
+                <Feather name="share-2" size={20} color="#FFF" />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.infoSection}>
+            <ThemedText style={styles.userName}>{user?.name || "Guest User"}</ThemedText>
+            <ThemedText style={styles.userEmail}>{user?.email}</ThemedText>
+            <View style={styles.roleBadge}>
+              <ThemedText style={styles.roleText}>{user?.role?.toUpperCase()}</ThemedText>
+            </View>
+            {user?.bio && (
+              <ThemedText style={styles.bioText} numberOfLines={2}>
+                {user.bio}
+              </ThemedText>
             )}
           </View>
 
-          <ThemedText type="h2" style={{ marginTop: Spacing.md, textAlign: 'center' }}>
-            {user?.name || "Guest User"}
-          </ThemedText>
-          <ThemedText style={{ color: theme.textSecondary, marginTop: 4, textAlign: 'center' }}>
-            {user?.email || "Sign in to access features"}
-          </ThemedText>
-
-          <View style={[styles.rolePill, { backgroundColor: `${theme.primary}20` }]}>
-            <ThemedText style={{ color: theme.primary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
-              {getRoleLabel(user?.role || 'guest')}
-            </ThemedText>
-          </View>
-        </View>
-
-        {/* Stats Row */}
-        {user && (
-          <View style={[styles.statsContainer, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
-            <View style={styles.statItem}>
-              <ThemedText type="h3">
-                {user.role === 'admin' ? stats?.createdEvents || 0 : stats?.participatedEvents || 0}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>Events</ThemedText>
+          {/* Dashboard Stats */}
+          <View style={styles.statsDashboard}>
+            <View style={styles.statBox}>
+              <ThemedText style={styles.statValue}>{stats?.participatedEvents || 0}</ThemedText>
+              <ThemedText style={styles.statTitle}>Joined</ThemedText>
             </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-            <View style={styles.statItem}>
-              <ThemedText type="h3">{stats?.tickets || 0}</ThemedText>
-              <ThemedText style={styles.statLabel}>Tickets</ThemedText>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <ThemedText style={styles.statValue}>{stats?.following || 0}</ThemedText>
+              <ThemedText style={styles.statTitle}>Following</ThemedText>
             </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-            <View style={styles.statItem}>
-              <ThemedText type="h3">{stats?.following || 0}</ThemedText>
-              <ThemedText style={styles.statLabel}>Following</ThemedText>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <ThemedText style={styles.statValue}>{stats?.followers || 0}</ThemedText>
+              <ThemedText style={styles.statTitle}>Followers</ThemedText>
             </View>
           </View>
-        )}
+        </Animated.View>
 
         {/* Menu Sections */}
-        <ThemedText style={styles.sectionTitle}>ACCOUNT</ThemedText>
-        <View style={[styles.menuCard, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
-          {accountItems.map((item, index) => (
-            <MenuRow
-              key={item.label}
-              item={item}
-              isLast={index === accountItems.length - 1}
-              theme={theme}
-            />
-          ))}
-        </View>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.menuSection}>
+          <ThemedText style={styles.sectionLabel}>Account Management</ThemedText>
+          <View style={styles.glassMenu}>
+            {accountItems.map((item, index) => (
+              <MenuRow key={item.label} item={item} isLast={index === accountItems.length - 1} theme={{}} />
+            ))}
+          </View>
 
-        <ThemedText style={styles.sectionTitle}>SUPPORT</ThemedText>
-        <View style={[styles.menuCard, { backgroundColor: theme.backgroundDefault }, Shadows.sm]}>
-          {supportItems.map((item, index) => (
-            <MenuRow
-              key={item.label}
-              item={item}
-              isLast={index === supportItems.length - 1}
-              theme={theme}
-            />
-          ))}
-        </View>
+          <ThemedText style={styles.sectionLabel}>Help & Support</ThemedText>
+          <View style={styles.glassMenu}>
+            {supportItems.map((item, index) => (
+              <MenuRow key={item.label} item={item} isLast={index === supportItems.length - 1} theme={{}} />
+            ))}
+          </View>
 
-        {/* Logout */}
-        <View style={{ marginTop: Spacing.xl }}>
           <Pressable
-            onPress={handleLogout}
+            onPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              logout();
+            }}
             style={({ pressed }) => [
-              styles.logoutButton,
-              {
-                backgroundColor: pressed ? `${theme.error}20` : 'transparent',
-                borderColor: theme.error,
-              }
+              styles.logoutBtn,
+              { opacity: pressed ? 0.8 : 1 }
             ]}
           >
-            <Icon name="log-out" size={20} color={theme.error} />
-            <ThemedText style={{ color: theme.error, fontWeight: '600' }}>
-              {user ? "Log Out" : "Log In"}
-            </ThemedText>
+            <MaterialCommunityIcons name="logout" size={22} color="#EF4444" />
+            <ThemedText style={styles.logoutText}>Sign Out</ThemedText>
           </Pressable>
-        </View>
 
-        <ThemedText style={styles.versionText}>Global Scale App v1.0.0</ThemedText>
-
-      </ScrollView>
-    </View>
+          <ThemedText style={styles.versionInfo}>Version 1.0.1 (Production)</ThemedText>
+        </Animated.View>
+      </Animated.ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerTitleRow: {
-    marginBottom: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  container: { flex: 1, backgroundColor: "#111827" },
+  coverWrapper: { height: COVER_HEIGHT, overflow: "hidden" },
+  coverContainer: { width: "100%", height: "100%" },
+  coverImage: { width: "100%", height: "100%" },
+  profileCard: {
+    marginTop: -100,
+    paddingHorizontal: 24,
   },
-  identityCard: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
+  avatarRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  avatarContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    borderWidth: 2,
-    padding: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarBorder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: "#111827",
+    backgroundColor: "#111827",
+    ...Shadows.lg,
   },
-  avatarWrapperInner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100, // Ensure perfect circle
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-  },
-  avatarFill: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarText: {
-    fontSize: 40,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
+  avatar: { width: "100%", height: "100%", borderRadius: 60 },
   verifiedBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#25D366',
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    backgroundColor: "#111827",
     borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000', // Match background or adjust
+    padding: 2,
   },
-  rolePill: {
-    marginTop: Spacing.md,
+  actionHeaderButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 10,
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  infoSection: { marginBottom: 24 },
+  userName: { fontSize: 28, fontWeight: "900", color: "#FFF", marginBottom: 4 },
+  userEmail: { fontSize: 15, color: "#9CA3AF", fontWeight: "600", marginBottom: 12 },
+  roleBadge: {
+    alignSelf: "flex-start",
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(124, 58, 237, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(124, 58, 237, 0.3)",
+    marginBottom: 16,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.xl,
-    alignItems: 'center',
+  roleText: { fontSize: 10, fontWeight: "800", color: "#7C3AED", letterSpacing: 1 },
+  bioText: { fontSize: 14, color: "#D1D5DB", lineHeight: 22, fontWeight: "500" },
+  statsDashboard: {
+    flexDirection: "row",
+    backgroundColor: "#1F2937",
+    borderRadius: 24,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "space-between",
+    ...Shadows.md,
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 4,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    opacity: 0.1,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
-    marginLeft: Spacing.xs,
-    opacity: 0.5,
-  },
-  menuCard: {
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.lg,
-    overflow: 'hidden',
+  statBox: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 20, fontWeight: "900", color: "#FFF" },
+  statTitle: { fontSize: 12, color: "#9CA3AF", fontWeight: "700", marginTop: 4 },
+  statDivider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.05)" },
+  menuSection: { paddingHorizontal: 20, marginTop: 32 },
+  sectionLabel: { fontSize: 13, fontWeight: "800", color: "#4B5563", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 16, marginLeft: 4 },
+  glassMenu: {
+    backgroundColor: "#1F2937",
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
   },
   menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
   },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
+  menuIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(124, 58, 237, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-  menuTextContainer: {
-    flex: 1,
-  },
-  badge: {
+  menuTextContainer: { flex: 1 },
+  menuLabel: { fontSize: 16, fontWeight: "700", color: "#FFF" },
+  menuDescription: { fontSize: 12, color: "#6B7280", marginTop: 2, fontWeight: "500" },
+  menuBadge: {
+    backgroundColor: "#EF4444",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    marginRight: Spacing.sm,
+    marginRight: 8,
   },
-  logoutButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    gap: Spacing.sm,
+  menuBadgeText: { fontSize: 10, fontWeight: "900", color: "#FFF" },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 60,
+    borderRadius: 24,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderWidth: 1.5,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    gap: 12,
+    marginTop: 8,
   },
-  versionText: {
-    textAlign: 'center',
-    marginTop: Spacing.xl,
-    opacity: 0.3,
-    fontSize: 12,
-  },
+  logoutText: { fontSize: 16, fontWeight: "800", color: "#EF4444" },
+  versionInfo: { textAlign: "center", fontSize: 12, color: "#4B5563", marginTop: 24, fontWeight: "600" },
 });
