@@ -35,6 +35,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const [showShareModal, setShowShareModal] = useState(false);
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const scrollY = useSharedValue(0);
 
     const { data: event, isLoading, refetch: refetchEvent } = useQuery({
@@ -115,10 +116,29 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
             const method = favoriteStatus?.isFavorited ? "DELETE" : "POST";
             await apiRequest(method, `/api/favorites/${eventId}`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+            await queryClient.cancelQueries({ queryKey: [`/api/favorites/${eventId}`] });
+
+            // Snapshot the previous value
+            const previousStatus = queryClient.getQueryData([`/api/favorites/${eventId}`]);
+
+            // Optimistically update to the new value
+            queryClient.setQueryData([`/api/favorites/${eventId}`], (old: any) => ({
+                ...old,
+                isFavorited: !old?.isFavorited
+            }));
+
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+            return { previousStatus };
+        },
+        onError: (err, newTodo, context) => {
+            queryClient.setQueryData([`/api/favorites/${eventId}`], context?.previousStatus);
+        },
+        onSettled: () => {
             refetchFavorite();
             queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
     });
 
@@ -289,14 +309,23 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         </View>
                     </View>
 
-                    {/* About Section */}
                     <View style={styles.sectionHeader}>
                         <ThemedText style={styles.sectionTitle}>About Event</ThemedText>
                     </View>
-                    <ThemedText style={styles.description}>
-                        {event.description || "Join us for an unforgettable experience filled with amazing performances and great vibes."}
-                        <ThemedText style={styles.readMore}> Read more...</ThemedText>
-                    </ThemedText>
+                    <Pressable onPress={() => {
+                        Platform.OS !== 'web' && import('react-native').then(({ LayoutAnimation }) => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut));
+                        setIsDescriptionExpanded(!isDescriptionExpanded);
+                    }}>
+                        <ThemedText
+                            style={styles.description}
+                            numberOfLines={isDescriptionExpanded ? undefined : 3}
+                        >
+                            {event.description || "Join us for an unforgettable experience filled with amazing performances and great vibes."}
+                        </ThemedText>
+                        {!isDescriptionExpanded && (
+                            <ThemedText style={styles.readMore}>Read more...</ThemedText>
+                        )}
+                    </Pressable>
 
                     {/* Hosted By */}
                     <View style={styles.sectionHeader}>

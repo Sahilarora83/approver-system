@@ -111,6 +111,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
     const renderItem = ({ item, index }: any) => {
         const { icon, color, bg } = getIconInfo(item.type);
+        const typeLabel = (item.type || 'system').toUpperCase().replace('_', ' ');
 
         return (
             <Animated.View entering={FadeInRight.delay(index * 50).duration(400).springify()}>
@@ -120,35 +121,45 @@ export default function NotificationsScreen({ navigation }: any) {
                         styles.item,
                         {
                             transform: [{ scale: pressed ? 0.98 : 1 }],
-                            backgroundColor: item.read ? "rgba(255,255,255,0.03)" : "rgba(124, 58, 237, 0.05)",
-                            borderColor: !item.read ? "rgba(124, 58, 237, 0.2)" : "rgba(255,255,255,0.05)",
-                        }
+                            backgroundColor: item.read ? "rgba(31, 41, 55, 0.4)" : "rgba(124, 58, 237, 0.08)",
+                            borderColor: !item.read ? "rgba(124, 58, 237, 0.3)" : "rgba(255, 255, 255, 0.05)",
+                        },
+                        !item.read && Shadows.md
                     ]}
                 >
                     <View style={[styles.iconBox, { backgroundColor: bg }]}>
-                        <Icon name={icon as any} size={22} color={color} />
+                        <Icon name={icon as any} size={20} color={color} />
                     </View>
 
                     <View style={styles.textContainer}>
                         <View style={styles.itemHeader}>
-                            <ThemedText style={[styles.itemTitle, !item.read && styles.unreadTitle]}>
-                                {item.title}
-                            </ThemedText>
+                            <View style={[styles.typeBadge, { backgroundColor: `${color}20` }]}>
+                                <ThemedText style={[styles.typeBadgeText, { color: color }]}>{typeLabel}</ThemedText>
+                            </View>
                             <ThemedText style={styles.timeText}>
                                 {(() => {
                                     try {
                                         const d = new Date(item.createdAt);
                                         return formatDistanceToNow(d, { addSuffix: true });
-                                    } catch { return "Recent"; }
+                                    } catch { return "now"; }
                                 })()}
                             </ThemedText>
                         </View>
+
+                        <ThemedText style={[styles.itemTitle, !item.read && styles.unreadTitle]}>
+                            {item.title}
+                        </ThemedText>
+
                         <ThemedText numberOfLines={2} style={styles.itemBody}>
                             {item.body}
                         </ThemedText>
                     </View>
 
-                    {!item.read && <View style={[styles.unreadDot, { backgroundColor: color }]} />}
+                    {!item.read && (
+                        <View style={styles.unreadIndicator}>
+                            <View style={[styles.unreadDot, { backgroundColor: color }]} />
+                        </View>
+                    )}
                 </Pressable>
             </Animated.View>
         );
@@ -281,5 +292,19 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         textAlign: "center",
         lineHeight: 22,
+    },
+    typeBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    typeBadgeText: {
+        fontSize: 10,
+        fontWeight: "900",
+        letterSpacing: 0.5,
+    },
+    unreadIndicator: {
+        justifyContent: "center",
+        alignItems: "center",
     },
 });
