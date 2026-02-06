@@ -7,9 +7,8 @@ export function useAutoUpdate() {
     useEffect(() => {
         async function checkUpdate() {
             try {
-                if (__DEV__) return;
-
                 const update = await Updates.checkForUpdateAsync();
+                console.log("[Update Check] Available:", update.isAvailable);
                 if (update.isAvailable) {
                     setIsUpdateAvailable(true);
                 }
