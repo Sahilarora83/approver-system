@@ -289,7 +289,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         ) : (
                             <>
                                 <Image
-                                    source={require("@/assets/images/icon.png")}
+                                    source={require("../../assets/images/icon.png")}
                                     style={styles.emptyImage}
                                     contentFit="contain"
                                 />
