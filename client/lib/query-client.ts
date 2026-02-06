@@ -34,6 +34,10 @@ export function resolveImageUrl(path: string | null | undefined): string {
     if (path.startsWith("http")) {
       // If it is a Supabase URL or any other external URL, return it directly.
       if (!path.includes("localhost") && !path.includes("127.0.0.1") && !path.includes("192.168.")) {
+        // Optimization: For images in Supabase, add resizing params if they don't exist
+        if (path.includes("supabase.co") && !path.includes("?")) {
+          return `${path}?width=600&quality=75`;
+        }
         return path;
       }
 

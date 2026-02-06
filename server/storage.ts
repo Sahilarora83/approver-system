@@ -27,6 +27,7 @@ export interface IStorage {
   getRegistration(id: string): Promise<(Registration & { event: Event }) | undefined>;
   getRegistrationByQR(qrCode: string): Promise<(Registration & { event: Event }) | undefined>;
   getUserRegistrations(userId: string): Promise<(Registration & { event: Event })[]>;
+  getUsersWithTokens(userIds: string[]): Promise<{ id: string, pushToken: string | null }[]>;
   getUserRegistrationsByEmail(email: string): Promise<(Registration & { event: Event })[]>;
   createRegistration(data: Omit<Registration, "id" | "createdAt" | "qrCode" | "ticketLink">): Promise<Registration>;
   updateRegistrationStatus(id: string, status: string): Promise<Registration | undefined>;
@@ -58,6 +59,16 @@ export interface IStorage {
 }
 
 export class SupabaseStorage implements IStorage {
+  async getUsersWithTokens(userIds: string[]): Promise<{ id: string, pushToken: string | null }[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, push_token')
+      .in('id', userIds);
+
+    if (error) throw new Error(error.message);
+    return data.map((u: any) => ({ id: u.id, pushToken: u.push_token }));
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const { data, error } = await supabase
       .from('users')
@@ -292,8 +303,14 @@ export class SupabaseStorage implements IStorage {
     return !error;
   }
 
-  async getRegistrations(eventId: string, limit: number = 50, offset: number = 0): Promise<Registration[]> {
-    const { data, error } = await supabase
+  async getRegistrations(
+    eventId: string,
+    limit: number = 50,
+    offset: number = 0,
+    search?: string,
+    status?: string
+  ): Promise<Registration[]> {
+    let query = supabase
       .from('registrations')
       .select(`
         *,
@@ -301,7 +318,19 @@ export class SupabaseStorage implements IStorage {
           profile_image
         )
       `)
-      .eq('event_id', eventId)
+      .eq('event_id', eventId);
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    if (search) {
+      // Use efficient text search if indexed, otherwise fallback to ilike
+      // Supabase's .or() is powerful for multiple field searching
+      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

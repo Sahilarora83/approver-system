@@ -658,20 +658,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // 3c. Batch Push Notifications
-        const pushMessages: any[] = [];
-        for (const userId of chunk) {
-          const user = await storage.getUser(userId);
-          if (user?.pushToken) {
-            pushMessages.push({
-              to: user.pushToken,
-              sound: 'default',
-              title: title || `Update: ${event.title}`,
-              body: message,
-              data: { relatedId: event.id, type: "broadcast" },
-              priority: 'high',
-            });
-          }
-        }
+        const usersWithTokens = await storage.getUsersWithTokens(chunk);
+        const pushMessages = usersWithTokens
+          .filter(u => u.pushToken)
+          .map(user => ({
+            to: user.pushToken!,
+            sound: 'default',
+            title: title || `Update: ${event.title}`,
+            body: message,
+            data: { relatedId: event.id, type: "broadcast" },
+            priority: 'high',
+          }));
+
         if (pushMessages.length > 0) {
           await sendExpoBatch(pushMessages);
         }
@@ -770,7 +768,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
-      const registrations = await storage.getRegistrations(String(req.params.id), limit, offset);
+      const search = req.query.search as string;
+      const status = req.query.status as string;
+
+      const registrations = await storage.getRegistrations(
+        String(req.params.id),
+        limit,
+        offset,
+        search,
+        status
+      );
       res.json(registrations);
     } catch (error) {
       res.status(500).json({ message: "Failed to get registrations" });

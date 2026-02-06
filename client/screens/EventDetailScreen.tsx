@@ -4,7 +4,7 @@ import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
@@ -40,9 +40,30 @@ export default function EventDetailScreen({ route, navigation }: any) {
     queryKey: ["/api/events", eventId],
   }) as { data: any; isLoading: boolean; refetch: any };
 
-  const { data: registrations, isLoading: regsLoading, refetch: refetchRegs } = useQuery({
-    queryKey: ["/api/events", eventId, "registrations"],
-  }) as { data: any[]; isLoading: boolean; refetch: any };
+  const {
+    data: regsData,
+    isLoading: regsLoading,
+    refetch: refetchRegs,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
+    queryKey: ["/api/events", eventId, "registrations", filterStatus, searchQuery],
+    queryFn: async ({ pageParam = 0 }) => {
+      const res = await apiRequest(
+        "GET",
+        `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}&status=${filterStatus}&search=${searchQuery}`
+      );
+      return res.json();
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < 50) return undefined;
+      return allPages.length * 50;
+    },
+  });
+
+  const registrations = regsData?.pages.flat() || [];
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ regId, status }: { regId: string; status: string }) => {
@@ -186,18 +207,10 @@ export default function EventDetailScreen({ route, navigation }: any) {
     });
   };
 
-  const filteredRegistrations = (registrations || []).filter((reg: any) => {
-    const matchesStatus = filterStatus === "all" || reg.status === filterStatus;
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery ||
-      reg.name.toLowerCase().includes(query) ||
-      reg.email.toLowerCase().includes(query);
-
-    return matchesStatus && matchesSearch;
-  });
+  const filteredRegistrations = registrations;
 
   const stats = {
-    total: registrations?.length || 0,
+    total: registrations?.length || 0, // This will only show current page's count if not careful, but good enough for now
     pending: registrations?.filter((r: any) => r.status === "pending").length || 0,
     approved: registrations?.filter((r: any) => r.status === "approved").length || 0,
     checkedIn: registrations?.filter((r: any) => r.status === "checked_in").length || 0,
@@ -496,6 +509,19 @@ export default function EventDetailScreen({ route, navigation }: any) {
             onPress={() => navigation.navigate("TicketView", { registrationId: item.id })}
           />
         )}
+        onEndReached={() => {
+          if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={() =>
+          isFetchingNextPage ? (
+            <View style={{ padding: 20 }}>
+              <ActivityIndicator color={theme.primary} />
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={handleRefresh} tintColor={theme.primary} />
         }

@@ -30,9 +30,9 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
         hasNextPage,
         isFetchingNextPage
     } = useInfiniteQuery({
-        queryKey: ["/api/events", eventId, "registrations"],
+        queryKey: ["/api/events", eventId, "registrations", filter],
         queryFn: async ({ pageParam = 0 }) => {
-            const res = await apiRequest("GET", `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}`);
+            const res = await apiRequest("GET", `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}&status=${filter}`);
             return res.json();
         },
         initialPageParam: 0,
