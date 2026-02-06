@@ -5,9 +5,10 @@ import * as schema from "@shared/schema";
 export const pool = process.env.DATABASE_URL
   ? new pg.Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 20, // Max concurrent connections
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    max: 15, // Slightly lower max to avoid hitting Supabase free tier limits
+    idleTimeoutMillis: 60000, // 1 minute
+    connectionTimeoutMillis: 10000, // 10 seconds (Relaxed for reliable connection)
+    ssl: { rejectUnauthorized: false } // Required for some hosted DBs
   })
   : null;
 

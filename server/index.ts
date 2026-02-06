@@ -8,6 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const app = express();
+app.set("trust proxy", 1); // Trust first proxy (Koyeb/Railway)
 const log = console.log;
 
 declare module "http" {
