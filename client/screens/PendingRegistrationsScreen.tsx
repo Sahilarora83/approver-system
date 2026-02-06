@@ -36,6 +36,7 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
             return res.json();
         },
         initialPageParam: 0,
+        staleTime: 30000,
         getNextPageParam: (lastPage, allPages) => {
             if (lastPage.length < 50) return undefined;
             return allPages.length * 50;
@@ -190,10 +191,7 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
-    const filteredRegistrations = registrations.filter((r: any) => {
-        if (filter === "all") return true;
-        return r.status === filter;
-    });
+    const filteredRegistrations = registrations;
 
     const getStatusColor = (status: string) => {
         switch (status) {

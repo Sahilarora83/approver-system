@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useDebounce } from "../hooks/useDebounce";
 import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Pressable, Share, Modal, ScrollView, Linking, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TextInput as RNTextInput } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
@@ -30,6 +31,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
   const [activeTab, setActiveTab] = useState<Tab>("registrations");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 400);
+
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -38,6 +41,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
 
   const { data: event, isLoading: eventLoading, refetch: refetchEvent } = useQuery({
     queryKey: ["/api/events", eventId],
+    staleTime: 60000, // Keep event data fresh for 1 min
   }) as { data: any; isLoading: boolean; refetch: any };
 
   const {
@@ -48,15 +52,16 @@ export default function EventDetailScreen({ route, navigation }: any) {
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: ["/api/events", eventId, "registrations", filterStatus, searchQuery],
+    queryKey: ["/api/events", eventId, "registrations", filterStatus, debouncedSearch],
     queryFn: async ({ pageParam = 0 }) => {
       const res = await apiRequest(
         "GET",
-        `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}&status=${filterStatus}&search=${searchQuery}`
+        `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}&status=${filterStatus}&search=${debouncedSearch}`
       );
       return res.json();
     },
     initialPageParam: 0,
+    staleTime: 30000, // 30s cache for registrations
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < 50) return undefined;
       return allPages.length * 50;

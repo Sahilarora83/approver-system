@@ -414,6 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/events", requireAuth, async (req, res) => {
     try {
+      res.set('Cache-Control', 'private, max-age=30');
       const events = await storage.getEvents(req.session.userId!);
       res.json(events);
     } catch (error) {
@@ -423,6 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/events/:id", async (req, res) => {
     try {
+      res.set('Cache-Control', 'public, max-age=60');
       const event = await storage.getEvent(String(req.params.id));
       if (!event) return res.status(404).json({ message: "Event not found" });
       res.json(event);
@@ -786,6 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/events/public/:link", async (req, res) => {
     try {
+      res.set('Cache-Control', 'public, max-age=60, s-maxage=60');
       const event = await storage.getEventByPublicLink(req.params.link);
       if (!event) return res.status(404).json({ message: "Event not found" });
       res.json(event);
