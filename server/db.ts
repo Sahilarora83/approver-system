@@ -5,6 +5,9 @@ import * as schema from "@shared/schema";
 export const pool = process.env.DATABASE_URL
   ? new pg.Pool({
     connectionString: process.env.DATABASE_URL,
+    max: 20, // Max concurrent connections
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
   })
   : null;
 

@@ -805,6 +805,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const registration = await storage.updateRegistrationStatus(String(req.params.id), status);
       if (!registration) return res.status(404).json({ message: "Registration not found" });
 
+      // Socket Emit for real-time status update in client
+      const io = (app as any).io;
+      if (io) {
+        io.to(`event:${registration.eventId}`).emit("registration-updated", {
+          registrationId: registration.id,
+          status: registration.status
+        });
+        if (registration.userId) {
+          io.to(`user:${registration.userId}`).emit("ticket-status-changed", {
+            registrationId: registration.id,
+            status: registration.status,
+            eventTitle: "Event Update" // ideally fetch this but for now simple
+          });
+        }
+      }
+
       // Notify participant
       if (registration.userId) {
         let title = "Registration Update";
@@ -844,7 +860,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         registrationIds.map(id => storage.updateRegistrationStatus(String(id), status))
       );
 
-      const successful = results.filter(r => r !== undefined);
+      const successful = results.filter(r => r !== undefined) as any[];
+
+      // Socket Emit for bulk updates
+      const io = (app as any).io;
+      if (io && successful.length > 0) {
+        successful.forEach(reg => {
+          io.to(`event:${reg.eventId}`).emit("registration-updated", {
+            registrationId: reg.id,
+            status: reg.status
+          });
+          if (reg.userId) {
+            io.to(`user:${reg.userId}`).emit("ticket-status-changed", {
+              registrationId: reg.id,
+              status: reg.status
+            });
+          }
+        });
+      }
+
       res.json({
         message: `Updated ${successful.length} of ${registrationIds.length} registrations`,
         updated: successful.length,

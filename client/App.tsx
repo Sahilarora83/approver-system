@@ -18,6 +18,7 @@ import { FloatingNotification } from "@/components/FloatingNotification";
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors } from "@/constants/theme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -226,9 +227,11 @@ export default function App() {
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <NotificationWrapper>
-                <AppWithKeyboard />
-              </NotificationWrapper>
+              <SocketProvider>
+                <NotificationWrapper>
+                  <AppWithKeyboard />
+                </NotificationWrapper>
+              </SocketProvider>
             </AuthProvider>
           </QueryClientProvider>
         </ErrorBoundary>

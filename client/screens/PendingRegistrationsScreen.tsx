@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { StyleSheet, View, FlatList, ActivityIndicator, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
@@ -10,6 +10,9 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { Skeleton } from "@/components/Skeleton";
+import { useSocket } from "@/contexts/SocketContext";
+import { useEffect } from "react";
 
 export default function PendingRegistrationsScreen({ route, navigation }: any) {
     const { eventId } = route.params;
@@ -20,19 +23,79 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
 
-    const { data: registrations = [], isLoading } = useQuery({
+    const {
+        data,
+        isLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteQuery({
         queryKey: ["/api/events", eventId, "registrations"],
-    }) as { data: any[]; isLoading: boolean };
+        queryFn: async ({ pageParam = 0 }) => {
+            const res = await apiRequest("GET", `/api/events/${eventId}/registrations?limit=50&offset=${pageParam}`);
+            return res.json();
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            if (lastPage.length < 50) return undefined;
+            return allPages.length * 50;
+        },
+    });
+
+    const registrations = data?.pages.flat() || [];
+    const { socket } = useSocket();
+
+    useEffect(() => {
+        if (socket) {
+            socket.emit("join-event", eventId);
+
+            const handleUpdate = (data: { registrationId: string; status: string }) => {
+                console.log("[Socket] Received update:", data);
+                queryClient.invalidateQueries({ queryKey: ["/api/events", eventId, "registrations"] });
+            };
+
+            socket.on("registration-updated", handleUpdate);
+
+            return () => {
+                socket.off("registration-updated", handleUpdate);
+            };
+        }
+    }, [socket, eventId]);
 
     const updateStatusMutation = useMutation({
         mutationFn: async ({ id, status }: { id: string; status: string }) => {
             const response = await apiRequest("PATCH", `/api/registrations/${id}/status`, { status });
             return response.json();
         },
+        // Optimistic UI Update
+        onMutate: async (newRegistration) => {
+            await queryClient.cancelQueries({ queryKey: ["/api/events", eventId, "registrations"] });
+            const previousRegistrations = queryClient.getQueryData(["/api/events", eventId, "registrations"]);
+
+            queryClient.setQueryData(["/api/events", eventId, "registrations"], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    pages: old.pages.map((page: any) =>
+                        page.map((reg: any) =>
+                            reg.id === newRegistration.id ? { ...reg, status: newRegistration.status } : reg
+                        )
+                    )
+                };
+            });
+
+            return { previousRegistrations };
+        },
+        onError: (err, newRegistration, context) => {
+            queryClient.setQueryData(["/api/events", eventId, "registrations"], context?.previousRegistrations);
+            Alert.alert("Error", "Failed to update status. Please try again.");
+        },
         onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/events", eventId, "registrations"] });
             queryClient.invalidateQueries({ queryKey: ["registration-status", eventId] });
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         },
     });
 
@@ -152,8 +215,28 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
 
     if (isLoading) {
         return (
-            <ThemedView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
+            <ThemedView style={styles.container}>
+                <View style={styles.filterContainer}>
+                    {[1, 2, 3, 4].map((i) => (
+                        <View key={i} style={styles.filterTab}>
+                            <Skeleton width={60} height={20} />
+                        </View>
+                    ))}
+                </View>
+                <View style={{ padding: Spacing.lg }}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <View key={i} style={[styles.registrationCard, { backgroundColor: theme.backgroundDefault, opacity: 0.6 }]}>
+                            <View style={styles.checkbox}>
+                                <Skeleton width={20} height={20} borderRadius={4} />
+                            </View>
+                            <View style={styles.registrationInfo}>
+                                <Skeleton width="60%" height={20} style={{ marginBottom: 8 }} />
+                                <Skeleton width="40%" height={14} style={{ marginBottom: 4 }} />
+                                <Skeleton width="30%" height={14} />
+                            </View>
+                        </View>
+                    ))}
+                </View>
             </ThemedView>
         );
     }
@@ -226,6 +309,19 @@ export default function PendingRegistrationsScreen({ route, navigation }: any) {
             <FlatList
                 data={filteredRegistrations}
                 keyExtractor={(item) => item.id}
+                onEndReached={() => {
+                    if (hasNextPage && !isFetchingNextPage) {
+                        fetchNextPage();
+                    }
+                }}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    isFetchingNextPage ? (
+                        <View style={{ padding: Spacing.md }}>
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        </View>
+                    ) : null
+                }
                 contentContainerStyle={{
                     paddingHorizontal: Spacing.lg,
                     paddingTop: Spacing.md,

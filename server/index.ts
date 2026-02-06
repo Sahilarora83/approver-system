@@ -1,5 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
 import * as fs from "fs";
@@ -57,8 +59,19 @@ function setupCors(app: express.Application) {
 }
 
 function setupBodyParsing(app: express.Application) {
+  app.use(compression()); // Compress all responses
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+  // Global Rate Limiting to prevent DDoS
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per 15 mins
+    message: "Too many requests from this IP, please try again after 15 minutes",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use("/api/", limiter);
 }
 
 function setupRequestLogging(app: express.Application) {
@@ -297,6 +310,36 @@ function setupErrorHandler(app: express.Application) {
   });
 
   const server = await registerRoutes(app);
+
+  // Initialize Socket.io
+  const { Server: SocketServer } = await import("socket.io");
+  const io = new SocketServer(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  (app as any).io = io;
+
+  io.on("connection", (socket) => {
+    const userId = socket.handshake.query.userId;
+    if (userId) {
+      socket.join(`user:${userId}`);
+      log(`Socket connected: ${socket.id} (User: ${userId})`);
+    } else {
+      log(`Socket connected: ${socket.id} (Guest)`);
+    }
+
+    socket.on("join-event", (eventId) => {
+      socket.join(`event:${eventId}`);
+      log(`Socket ${socket.id} joined event:${eventId}`);
+    });
+
+    socket.on("disconnect", () => {
+      log(`Socket disconnected: ${socket.id}`);
+    });
+  });
 
   setupErrorHandler(app);
 
