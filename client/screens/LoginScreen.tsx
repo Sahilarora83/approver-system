@@ -83,7 +83,7 @@ export default function LoginScreen({ navigation }: any) {
       // Pass selectedRole to login to enforce strict check at the context level
       await login(email.trim(), password, selectedRole);
 
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

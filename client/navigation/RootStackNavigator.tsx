@@ -55,7 +55,10 @@ export default function RootStackNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Navigator
+      key={user?.id || 'guest'}
+      screenOptions={screenOptions}
+    >
       {/* Public screens - accessible without login */}
 
 
@@ -69,11 +72,6 @@ export default function RootStackNavigator() {
           <Stack.Screen
             name="Signup"
             component={SignupScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="ParticipantMain"
-            component={ParticipantTabNavigator}
             options={{ headerShown: false }}
           />
         </>

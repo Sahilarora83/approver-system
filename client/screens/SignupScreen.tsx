@@ -93,7 +93,7 @@ export default function SignupScreen({ navigation }: any) {
 
     try {
       await signup(email.trim(), password, name.trim(), selectedRole);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       setError(err.message || "Signup failed. Please try again.");
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
