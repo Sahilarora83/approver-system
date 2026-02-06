@@ -22,6 +22,8 @@
       "package": "com.qrticket.manager",
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -58,6 +60,12 @@
         "projectId": "f46465b7-06f4-4c2c-b4f0-79cbf3f5957d"
       }
     },
-    "owner": "sahil8810"
+    "owner": "sahil8810",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f46465b7-06f4-4c2c-b4f0-79cbf3f5957d"
+    }
   }
 }
