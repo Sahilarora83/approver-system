@@ -19,6 +19,15 @@ import EditProfileScreen from "@/screens/EditProfileScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import NotificationsScreen from "@/screens/NotificationsScreen";
 import MetaScreen from "@/screens/MetaScreen";
+import {
+  NotificationSettingsScreen,
+  SecurityScreen,
+  LinkedAccountsScreen,
+  LanguageScreen,
+  InviteFriendsScreen,
+  PaymentMethodsScreen,
+  HelpCenterScreen
+} from "@/screens/ProfileWorkflows";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -34,7 +43,13 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   Notifications: undefined;
-  HelpCenter: { type: 'help' };
+  NotificationSettings: undefined;
+  Security: undefined;
+  LinkedAccounts: undefined;
+  Language: undefined;
+  InviteFriends: undefined;
+  PaymentMethods: undefined;
+  HelpCenter: undefined;
   AboutApp: { type: 'about' };
   PrivacyPolicy: { type: 'privacy' };
 };
@@ -131,7 +146,16 @@ export default function RootStackNavigator() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerTitle: "Edit Profile" }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerTitle: "Settings" }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerTitle: "Notifications" }} />
-      <Stack.Screen name="HelpCenter" component={MetaScreen} initialParams={{ type: 'help' }} />
+
+      {/* Profile Workflows */}
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Security" component={SecurityScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Language" component={LanguageScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+
       <Stack.Screen name="AboutApp" component={MetaScreen} initialParams={{ type: 'about' }} />
       <Stack.Screen name="PrivacyPolicy" component={MetaScreen} initialParams={{ type: 'privacy' }} />
     </Stack.Navigator>
