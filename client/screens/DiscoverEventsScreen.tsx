@@ -50,6 +50,31 @@ export default function DiscoverEventsScreen({ navigation }: any) {
     const [isLocationLoading, setIsLocationLoading] = useState(true);
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [sortBy, setSortBy] = useState<"date" | "title">("date");
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const searchBgAnim = useSharedValue(0);
+
+    useEffect(() => {
+        searchBgAnim.value = withRepeat(
+            withTiming(1, { duration: 4000 }),
+            -1,
+            true
+        );
+    }, []);
+
+    const animatedSearchStyle = useAnimatedStyle(() => {
+        return {
+            borderColor: isSearchFocused ? COLORS.primary : "rgba(255,255,255,0.1)",
+            transform: [{ scale: withTiming(isSearchFocused ? 1.02 : 1, { duration: 200 }) }],
+            backgroundColor: isSearchFocused ? "rgba(31, 41, 55, 0.8)" : "rgba(31, 41, 55, 0.4)",
+        };
+    });
+
+    const searchGradientStyle = useAnimatedStyle(() => {
+        return {
+            opacity: withTiming(isSearchFocused ? 0.15 : 0.05, { duration: 300 }),
+            transform: [{ translateX: (searchBgAnim.value - 0.5) * 100 }]
+        };
+    });
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
@@ -290,19 +315,36 @@ export default function DiscoverEventsScreen({ navigation }: any) {
 
             {/* Search Bar */}
             <View style={styles.searchBarContainer}>
-                <View style={styles.searchBar}>
-                    <Feather name="search" size={20} color="#6B7280" />
+                <Animated.View style={[styles.searchBar, animatedSearchStyle]}>
+                    <Animated.View style={[StyleSheet.absoluteFill, searchGradientStyle]}>
+                        <LinearGradient
+                            colors={[COLORS.primary, "transparent", COLORS.accent]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    </Animated.View>
+
+                    <Feather name="search" size={20} color={isSearchFocused ? COLORS.primary : "#6B7280"} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="What event are you looking for?"
+                        placeholder="Search events, organizers, or vibes..."
                         placeholderTextColor="#6B7280"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
+                        onFocus={() => {
+                            setIsSearchFocused(true);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        onBlur={() => setIsSearchFocused(false)}
                     />
-                    <Pressable style={styles.filterBarIcon} onPress={() => setShowFilterModal(true)}>
-                        <MaterialCommunityIcons name="tune-variant" size={20} color="#7C3AED" />
+                    <Pressable
+                        style={[styles.filterBarIcon, isSearchFocused && { backgroundColor: "rgba(124, 58, 237, 0.2)" }]}
+                        onPress={() => setShowFilterModal(true)}
+                    >
+                        <MaterialCommunityIcons name="tune-variant" size={20} color={COLORS.primary} />
                     </Pressable>
-                </View>
+                </Animated.View>
             </View>
 
             {/* Featured Section */}

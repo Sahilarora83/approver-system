@@ -21,34 +21,43 @@ export const ConnectionStatus = () => {
     const [status, setStatus] = useState<"online" | "offline" | "connecting">("online");
     const lastReportedStatus = useRef<boolean | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const isFirstLoad = useRef(true);
 
     useEffect(() => {
-        // Clear any existing timer when isConnected change
+        // Debounce initial state to prevent "Pop Up" on launch
+        if (isFirstLoad.current) {
+            const initialTimer = setTimeout(() => {
+                isFirstLoad.current = false;
+                lastReportedStatus.current = isConnected;
+                // If we are actually offline after 3s, show it
+                if (!isConnected) {
+                    setStatus("offline");
+                    translateY.value = withSpring(0, { damping: 15 });
+                }
+            }, 3000);
+            return () => clearTimeout(initialTimer);
+        }
+
         if (timerRef.current) clearTimeout(timerRef.current);
 
-        // Logic to prevent "Baar Baar" (flickering)
-        // We wait 1.5 seconds of consistent state before showing a change
         timerRef.current = setTimeout(() => {
             if (lastReportedStatus.current === isConnected) return;
 
             if (isConnected) {
-                // Was it offline before?
                 if (lastReportedStatus.current === false) {
                     setStatus("online");
                     translateY.value = withSpring(0, { damping: 15 });
 
-                    // Hide after success
                     setTimeout(() => {
-                        translateY.value = withSpring(-120);
-                    }, 3000);
+                        translateY.value = withTiming(-130, { duration: 800 });
+                    }, 2500);
                 }
             } else {
-                // Show offline immediately or after tiny delay
                 setStatus("offline");
-                translateY.value = withSpring(0, { damping: 15 });
+                translateY.value = withSpring(0, { damping: 12 });
             }
             lastReportedStatus.current = isConnected;
-        }, isConnected ? 500 : 1500); // Connects show faster, disconnects wait to be sure
+        }, isConnected ? 300 : 2000);
 
         return () => {
             if (timerRef.current) clearTimeout(timerRef.current);
