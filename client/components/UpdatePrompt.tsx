@@ -1,10 +1,11 @@
-import React from "react";
-import { StyleSheet, View, Text, Pressable, Dimensions, Platform } from "react-native";
-import Animated, { FadeInDown, FadeOutDown, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import React, { useState } from "react";
+import { StyleSheet, View, Text, Pressable, Dimensions, Platform, ActivityIndicator } from "react-native";
+import Animated, { FadeInDown, FadeOutUp, SlideInUp, SlideOutUp } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Updates from "expo-updates";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -14,23 +15,28 @@ interface UpdatePromptProps {
 }
 
 export const UpdatePrompt = ({ isVisible, onDismiss }: UpdatePromptProps) => {
+    const insets = useSafeAreaInsets();
+    const [isUpdating, setIsUpdating] = useState(false);
+
     if (!isVisible) return null;
 
     const handleUpdate = async () => {
         try {
+            setIsUpdating(true);
             await Updates.fetchUpdateAsync();
             await Updates.reloadAsync();
         } catch (error) {
             console.error("Update failed:", error);
-            onDismiss();
+            setIsUpdating(false);
+            onDismiss(); // Dismiss if failed
         }
     };
 
     return (
         <Animated.View
-            entering={SlideInDown.springify().damping(15)}
-            exiting={SlideOutDown}
-            style={styles.container}
+            entering={SlideInUp.springify().damping(15)}
+            exiting={SlideOutUp}
+            style={[styles.container, { top: insets.top + 10 }]}
         >
             <BlurView intensity={80} tint="dark" style={styles.blur}>
                 <View style={styles.content}>
@@ -39,41 +45,49 @@ export const UpdatePrompt = ({ isVisible, onDismiss }: UpdatePromptProps) => {
                             colors={["#7C3AED", "#6D28D9"]}
                             style={styles.iconGradient}
                         >
-                            <Feather name="refresh-cw" size={24} color="#FFF" />
+                            <Feather name="download-cloud" size={24} color="#FFF" />
                         </LinearGradient>
                     </View>
 
                     <View style={styles.textContainer}>
                         <Text style={styles.title}>Update Available</Text>
                         <Text style={styles.description}>
-                            A new version of the app is available with latest features and improvements.
+                            A new version is ready.
                         </Text>
+                    </View>
+
+                    <View style={styles.actions}>
+                        <Pressable
+                            style={styles.laterButton}
+                            onPress={onDismiss}
+                            disabled={isUpdating}
+                        >
+                            <Feather name="x" size={20} color="#9CA3AF" />
+                        </Pressable>
                     </View>
                 </View>
 
-                <View style={styles.buttonRow}>
-                    <Pressable
-                        style={styles.laterButton}
-                        onPress={onDismiss}
+                <Pressable
+                    style={styles.updateButton}
+                    onPress={handleUpdate}
+                    disabled={isUpdating}
+                >
+                    <LinearGradient
+                        colors={["#7C3AED", "#6D28D9"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.updateGradient}
                     >
-                        <Text style={styles.laterText}>Later</Text>
-                    </Pressable>
-
-                    <Pressable
-                        style={styles.updateButton}
-                        onPress={handleUpdate}
-                    >
-                        <LinearGradient
-                            colors={["#7C3AED", "#6D28D9"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.updateGradient}
-                        >
-                            <Text style={styles.updateText}>Update Now</Text>
-                            <Feather name="arrow-right" size={16} color="#FFF" />
-                        </LinearGradient>
-                    </Pressable>
-                </View>
+                        {isUpdating ? (
+                            <ActivityIndicator color="#FFF" size="small" />
+                        ) : (
+                            <>
+                                <Text style={styles.updateText}>Update Now</Text>
+                                <Feather name="arrow-right" size={16} color="#FFF" />
+                            </>
+                        )}
+                    </LinearGradient>
+                </Pressable>
             </BlurView>
         </Animated.View>
     );
@@ -82,39 +96,41 @@ export const UpdatePrompt = ({ isVisible, onDismiss }: UpdatePromptProps) => {
 const styles = StyleSheet.create({
     container: {
         position: "absolute",
-        bottom: 100, // Above tab bar if present
-        left: 20,
-        right: 20,
+        left: 16,
+        right: 16,
         zIndex: 10000,
-        borderRadius: 28,
+        borderRadius: 20,
         overflow: "hidden",
+        backgroundColor: "rgba(31, 41, 55, 0.9)", // Fallback
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 10 },
+                shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
-                shadowRadius: 20,
+                shadowRadius: 8,
             },
             android: {
-                elevation: 12,
+                elevation: 8,
             },
         }),
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.1)",
     },
     blur: {
-        padding: 20,
+        padding: 16,
     },
     content: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 20,
+        marginBottom: 16,
     },
     iconContainer: {
-        marginRight: 16,
+        marginRight: 12,
     },
     iconGradient: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -122,40 +138,31 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     title: {
-        fontSize: 18,
-        fontWeight: "900",
+        fontSize: 16,
+        fontWeight: "800",
         color: "#FFF",
-        marginBottom: 4,
     },
     description: {
-        fontSize: 13,
+        fontSize: 12,
         color: "#9CA3AF",
-        lineHeight: 18,
-        fontWeight: "600",
+        fontWeight: "500",
     },
-    buttonRow: {
+    actions: {
         flexDirection: "row",
-        gap: 12,
+        alignItems: "center",
+        gap: 8,
     },
     laterButton: {
-        flex: 1,
-        height: 50,
-        borderRadius: 25,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "rgba(255,255,255,0.05)",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.1)",
-    },
-    laterText: {
-        color: "#9CA3AF",
-        fontSize: 15,
-        fontWeight: "700",
     },
     updateButton: {
-        flex: 2,
-        height: 50,
-        borderRadius: 25,
+        height: 44,
+        borderRadius: 12,
         overflow: "hidden",
     },
     updateGradient: {
@@ -167,7 +174,8 @@ const styles = StyleSheet.create({
     },
     updateText: {
         color: "#FFF",
-        fontSize: 15,
-        fontWeight: "800",
+        fontSize: 14,
+        fontWeight: "700",
+        letterSpacing: 0.5,
     },
 });

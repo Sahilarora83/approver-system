@@ -139,6 +139,20 @@ export const Shadows = {
     shadowRadius: 8,
     elevation: 4,
   },
+  xl: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+  "2xl": {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 25 },
+    shadowOpacity: 0.25,
+    shadowRadius: 50,
+    elevation: 5,
+  },
 };
 
 export const Fonts = Platform.select({

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform, Dimensions } from "react-native";
+import { StyleSheet, View, FlatList, Pressable, ScrollView, TextInput, ActivityIndicator, Platform, Dimensions, Modal } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -48,6 +48,8 @@ export default function DiscoverEventsScreen({ navigation }: any) {
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [userCity, setUserCity] = useState("Detecting location...");
     const [isLocationLoading, setIsLocationLoading] = useState(true);
+    const [showFilterModal, setShowFilterModal] = useState(false);
+    const [sortBy, setSortBy] = useState<"date" | "title">("date");
 
     const { data: events = [], isLoading, refetch, isFetching } = useQuery({
         queryKey: ["/api/events/feed"],
@@ -143,7 +145,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
     );
 
     const filteredEvents = useMemo(() => {
-        return events.filter((event: any) => {
+        let result = events.filter((event: any) => {
             if (!event || !event.title) return false;
 
             const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -159,7 +161,15 @@ export default function DiscoverEventsScreen({ navigation }: any) {
             }
             return matchesSearch;
         });
-    }, [events, searchQuery, selectedCategory]);
+
+        if (sortBy === "date") {
+            result.sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        } else if (sortBy === "title") {
+            result.sort((a: any, b: any) => a.title.localeCompare(b.title));
+        }
+
+        return result;
+    }, [events, searchQuery, selectedCategory, sortBy]);
 
     const renderFeaturedCard = useCallback(({ item: event, index }: { item: any, index: number }) => (
         <Animated.View entering={FadeInRight.delay(index * 100).duration(500)}>
@@ -170,30 +180,36 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     { transform: [{ scale: pressed ? 0.98 : 1 }] }
                 ]}
             >
-                <View style={styles.featuredImageContainer}>
-                    <Image
-                        source={{ uri: resolveImageUrl(event.coverImage) }}
-                        style={styles.featuredImage}
-                        contentFit="cover"
-                        transition={300}
-                    />
-                </View>
+                <Image
+                    source={{ uri: resolveImageUrl(event.coverImage) }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={300}
+                />
+                <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.8)", "#000"]}
+                    style={StyleSheet.absoluteFill}
+                />
 
                 <View style={styles.featuredOverlayContent}>
-                    <ThemedText style={styles.featuredTitle} numberOfLines={1}>{event.title}</ThemedText>
-                    <ThemedText style={styles.featuredDetail} numberOfLines={1}>
-                        {safeFormat(event.startDate, "EEE, MMM d · HH:mm")}{event.endDate ? ` - ${safeFormat(event.endDate, "HH:mm")}` : ""} {new Date(event.startDate).getHours() >= 12 ? "PM" : "AM"}
-                    </ThemedText>
+                    <View style={styles.featuredBadge}>
+                        <ThemedText style={styles.featuredBadgeText}>Featured</ThemedText>
+                    </View>
+                    <ThemedText style={styles.featuredTitle} numberOfLines={2}>{event.title}</ThemedText>
+
                     <View style={styles.featuredMetaRow}>
                         <View style={styles.featuredInfoItem}>
-                            <Feather name="map-pin" size={16} color="#7C3AED" />
+                            <Feather name="calendar" size={14} color="#A78BFA" />
+                            <ThemedText style={styles.featuredMetaText}>
+                                {safeFormat(event.startDate, "MMM d, HH:mm")}
+                            </ThemedText>
+                        </View>
+                        <View style={styles.featuredInfoItem}>
+                            <Feather name="map-pin" size={14} color="#A78BFA" />
                             <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
                                 {event.location || "Online"}
                             </ThemedText>
                         </View>
-                        <Pressable style={styles.featuredInlineFav}>
-                            <Feather name="heart" size={22} color="#7C3AED" />
-                        </Pressable>
                     </View>
                 </View>
             </Pressable>
@@ -270,7 +286,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
-                    <Pressable style={styles.filterBarIcon}>
+                    <Pressable style={styles.filterBarIcon} onPress={() => setShowFilterModal(true)}>
                         <MaterialCommunityIcons name="tune-variant" size={20} color="#7C3AED" />
                     </Pressable>
                 </View>
@@ -339,7 +355,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                 ))}
             </ScrollView>
         </View>
-    ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard, isLoading]);
+    ), [user, greeting, searchQuery, featuredEvents, selectedCategory, navigation, renderFeaturedCard, isLoading, showFilterModal, sortBy]);
 
     return (
         <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
@@ -373,6 +389,42 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                     )
                 }
             />
+
+            {/* Simple Filter Modal */}
+            <Modal
+                transparent
+                visible={showFilterModal}
+                animationType="fade"
+                onRequestClose={() => setShowFilterModal(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setShowFilterModal(false)}>
+                    <View style={styles.modalContent}>
+                        <ThemedText style={styles.modalTitle}>Sort Events</ThemedText>
+
+                        <Pressable
+                            style={[styles.modalOption, sortBy === "date" && styles.modalOptionActive]}
+                            onPress={() => { setSortBy("date"); setShowFilterModal(false); }}
+                        >
+                            <Feather name="calendar" size={18} color={sortBy === "date" ? "#FFF" : "#9CA3AF"} />
+                            <ThemedText style={[styles.modalOptionText, sortBy === "date" && { color: "#FFF", fontWeight: "700" }]}>Date (Soonest)</ThemedText>
+                            {sortBy === "date" && <Feather name="check" size={18} color="#FFF" />}
+                        </Pressable>
+
+                        <Pressable
+                            style={[styles.modalOption, sortBy === "title" && styles.modalOptionActive]}
+                            onPress={() => { setSortBy("title"); setShowFilterModal(false); }}
+                        >
+                            <Feather name="type" size={18} color={sortBy === "title" ? "#FFF" : "#9CA3AF"} />
+                            <ThemedText style={[styles.modalOptionText, sortBy === "title" && { color: "#FFF", fontWeight: "700" }]}>Name (A-Z)</ThemedText>
+                            {sortBy === "title" && <Feather name="check" size={18} color="#FFF" />}
+                        </Pressable>
+
+                        <Pressable style={styles.modalCloseBtn} onPress={() => setShowFilterModal(false)}>
+                            <ThemedText style={styles.modalCloseText}>Cancel</ThemedText>
+                        </Pressable>
+                    </View>
+                </Pressable>
+            </Modal>
         </ThemedView>
     );
 }
@@ -482,31 +534,49 @@ const styles = StyleSheet.create({
     },
     featuredCard: {
         width: width * 0.85,
-        backgroundColor: "#1F2937",
-        borderRadius: 40,
-        overflow: "hidden",
-        ...Shadows.lg,
-        padding: 12,
-    },
-    featuredImageContainer: {
-        width: "100%",
-        height: width * 0.55,
+        height: width * 1.1,
         borderRadius: 32,
         overflow: "hidden",
+        marginRight: 16,
+        backgroundColor: "#1F2937",
+        ...Shadows.lg,
     },
     featuredImage: {
         width: "100%",
         height: "100%",
     },
     featuredOverlayContent: {
-        paddingTop: 16,
-        paddingHorizontal: 8,
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 20,
+        paddingBottom: 24,
+    },
+    featuredBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: "rgba(124, 58, 237, 0.9)",
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    featuredBadgeText: {
+        fontSize: 10,
+        fontWeight: "800",
+        color: "#FFF",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
     },
     featuredTitle: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: "900",
         color: "#FFF",
         marginBottom: 8,
+        lineHeight: 30,
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     featuredDetail: {
         fontSize: 15,
@@ -517,17 +587,16 @@ const styles = StyleSheet.create({
     featuredMetaRow: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
+        gap: 16,
     },
     featuredInfoItem: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
-        flex: 1,
+        gap: 6,
     },
     featuredMetaText: {
-        fontSize: 14,
-        color: "#9CA3AF",
+        fontSize: 13,
+        color: "#E5E7EB",
         fontWeight: "600",
     },
     featuredInlineFav: {
@@ -658,5 +727,56 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#9CA3AF",
         marginTop: 4,
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 24,
+    },
+    modalContent: {
+        width: "100%",
+        backgroundColor: "#1F2937",
+        borderRadius: 24,
+        padding: 24,
+        ...Shadows.xl,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.1)",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: "#FFF",
+        marginBottom: 20,
+        textAlign: "center",
+    },
+    modalOption: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 16,
+        borderRadius: 16,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        marginBottom: 12,
+        gap: 12,
+    },
+    modalOptionActive: {
+        backgroundColor: "#7C3AED",
+    },
+    modalOptionText: {
+        fontSize: 16,
+        color: "#D1D5DB",
+        fontWeight: "500",
+        flex: 1,
+    },
+    modalCloseBtn: {
+        marginTop: 8,
+        padding: 16,
+        alignItems: "center",
+    },
+    modalCloseText: {
+        color: "#9CA3AF",
+        fontWeight: "600",
     },
 });
