@@ -1,18 +1,17 @@
-import React from "react";
-import { StyleSheet, TextInput, View, TextInputProps } from "react-native";
+import React, { forwardRef, ReactNode } from "react";
+import { StyleSheet, TextInput, View, TextInputProps, Pressable } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { Icon } from "@/components/Icon";
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
+  rightIcon?: ReactNode;
 }
 
-import { Icon } from "@/components/Icon";
-import { Pressable } from "react-native";
-
-export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, ...props }: InputProps) {
+export const Input = forwardRef<TextInput, InputProps>(({ label, error, style, onFocus, onBlur, secureTextEntry, rightIcon, ...props }, ref) => {
   const { theme } = useTheme();
   const [isFocused, setIsFocused] = React.useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
@@ -30,6 +29,7 @@ export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, .
 
       <View style={styles.inputContainer}>
         <TextInput
+          ref={ref}
           style={[
             styles.input,
             {
@@ -45,7 +45,7 @@ export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, .
               shadowOpacity: isFocused ? 0.1 : 0,
               shadowRadius: 4,
               elevation: isFocused ? 2 : 0,
-              paddingRight: secureTextEntry ? 48 : Spacing.lg, // Make room for icon
+              paddingRight: rightIcon ? 48 : (secureTextEntry ? 48 : Spacing.lg), // Make room for icon
             },
             style,
           ]}
@@ -62,7 +62,7 @@ export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, .
           {...props}
         />
 
-        {secureTextEntry && (
+        {secureTextEntry ? (
           <Pressable
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
             style={styles.eyeIcon}
@@ -74,7 +74,11 @@ export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, .
               color={theme.textSecondary}
             />
           </Pressable>
-        )}
+        ) : rightIcon ? (
+          <View style={styles.eyeIcon}>
+            {rightIcon}
+          </View>
+        ) : null}
       </View>
 
       {error ? (
@@ -84,7 +88,7 @@ export function Input({ label, error, style, onFocus, onBlur, secureTextEntry, .
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
