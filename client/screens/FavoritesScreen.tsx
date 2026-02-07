@@ -63,6 +63,15 @@ export default function FavoritesScreen({ navigation }: any) {
         },
     });
 
+    const filteredFavorites = useMemo(() => {
+        if (!favorites || !Array.isArray(favorites)) return [];
+        return favorites.filter(f => {
+            if (!f.event) return false;
+            if (selectedCategory === "All") return true;
+            return f.event.category === selectedCategory;
+        });
+    }, [favorites, selectedCategory]);
+
     const renderHeader = () => (
         <View style={styles.header}>
             <View style={styles.headerTop}>
@@ -148,22 +157,12 @@ export default function FavoritesScreen({ navigation }: any) {
         );
     }
 
-    const filteredFavorites = useMemo(() => {
-        if (!favorites || !Array.isArray(favorites)) return [];
-        return favorites.filter(f => {
-            if (!f.event) return false;
-            if (selectedCategory === "All") return true;
-            return f.event.category === selectedCategory;
-        });
-    }, [favorites, selectedCategory]);
-
-
     return (
         <ThemedView style={styles.container}>
             <FlatList
                 key={viewMode}
                 data={filteredFavorites}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => item.id?.toString() || index.toString()}
                 numColumns={viewMode === "grid" ? 2 : 1}
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 100 }}
@@ -173,7 +172,13 @@ export default function FavoritesScreen({ navigation }: any) {
                         <View style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}>
                             <Pressable
                                 style={viewMode === "grid" ? styles.gridCard : styles.listCard}
-                                onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
+                                onPress={() => {
+                                    try {
+                                        navigation.navigate("ParticipantEventDetail", { eventId: item.eventId });
+                                    } catch (e) {
+                                        console.warn("Navigation failed:", e);
+                                    }
+                                }}
                             >
                                 <Image
                                     source={{ uri: resolveImageUrl(item.event.coverImage) }}
@@ -229,17 +234,17 @@ export default function FavoritesScreen({ navigation }: any) {
                         {removingItem && (
                             <View style={styles.previewCard}>
                                 <Image
-                                    source={{ uri: resolveImageUrl(removingItem.event.coverImage) }}
+                                    source={{ uri: resolveImageUrl(removingItem.event?.coverImage) }}
                                     style={styles.previewImage}
                                 />
                                 <View style={styles.previewInfo}>
-                                    <ThemedText style={styles.previewTitle}>{removingItem.event.title}</ThemedText>
+                                    <ThemedText style={styles.previewTitle}>{removingItem.event?.title || "Event"}</ThemedText>
                                     <ThemedText style={styles.previewDate}>
-                                        {safeFormat(removingItem.event.startDate, "EEE, MMM d · hh:mm a")}
+                                        {safeFormat(removingItem.event?.startDate, "EEE, MMM d · hh:mm a")}
                                     </ThemedText>
                                     <View style={styles.locationContainer}>
                                         <Ionicons name="location" size={12} color="#7C3AED" />
-                                        <ThemedText style={styles.locationText}>{removingItem.event.location}</ThemedText>
+                                        <ThemedText style={styles.locationText}>{removingItem.event?.location || "Online"}</ThemedText>
                                     </View>
                                 </View>
                             </View>
@@ -251,7 +256,11 @@ export default function FavoritesScreen({ navigation }: any) {
                             </Pressable>
                             <Pressable
                                 style={styles.confirmBtn}
-                                onPress={() => removeMutation.mutate(removingItem.eventId)}
+                                onPress={() => {
+                                    if (removingItem?.eventId) {
+                                        removeMutation.mutate(removingItem.eventId);
+                                    }
+                                }}
                             >
                                 <ThemedText style={styles.confirmBtnText}>Yes, Remove</ThemedText>
                             </Pressable>
