@@ -25,6 +25,17 @@ const CATEGORIES = [
     { name: "Workshop", icon: "briefcase" },
 ];
 
+const safeFormat = (date: any, fmt: string) => {
+    try {
+        if (!date) return "TBD";
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return "Invalid Date";
+        return format(d, fmt);
+    } catch (e) {
+        return "TBD";
+    }
+};
+
 export default function FavoritesScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
@@ -54,8 +65,11 @@ export default function FavoritesScreen({ navigation }: any) {
 
     const filteredFavorites = useMemo(() => {
         if (!favorites) return [];
-        if (selectedCategory === "All") return favorites;
-        return favorites.filter(f => f.event.category === selectedCategory);
+        return favorites.filter(f => {
+            if (!f.event) return false;
+            if (selectedCategory === "All") return true;
+            return f.event.category === selectedCategory;
+        });
     }, [favorites, selectedCategory]);
 
     const renderHeader = () => (
@@ -136,48 +150,51 @@ export default function FavoritesScreen({ navigation }: any) {
                 numColumns={viewMode === "grid" ? 2 : 1}
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 100 }}
-                renderItem={({ item, index }) => (
-                    <Animated.View
-                        entering={FadeInDown.delay(index * 50)}
-                        style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}
-                    >
-                        <Pressable
-                            style={viewMode === "grid" ? styles.gridCard : styles.listCard}
-                            onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
+                renderItem={({ item, index }) => {
+                    if (!item.event) return null;
+                    return (
+                        <Animated.View
+                            entering={FadeInDown.delay(index * 50)}
+                            style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}
                         >
-                            <Image
-                                source={{ uri: resolveImageUrl(item.event.coverImage) }}
-                                style={viewMode === "grid" ? styles.gridImage : styles.listImage}
-                            />
-                            {(!item.event.price || item.event.price === "0") && (
-                                <View style={styles.freeBadge}>
-                                    <ThemedText style={styles.freeText}>FREE</ThemedText>
-                                </View>
-                            )}
-                            <View style={viewMode === "grid" ? styles.gridInfo : styles.listInfo}>
-                                <ThemedText style={styles.eventTitle} numberOfLines={1}>{item.event.title}</ThemedText>
-                                <ThemedText style={styles.eventDate}>
-                                    {format(new Date(item.event.startDate), "EEE, MMM d · hh:mm a")}
-                                </ThemedText>
-                                <View style={styles.locationContainer}>
-                                    <Ionicons name="location" size={12} color="#7C3AED" />
-                                    <ThemedText style={styles.locationText} numberOfLines={1}>
-                                        {item.event.location || "Online"}
-                                    </ThemedText>
-                                </View>
-                            </View>
                             <Pressable
-                                style={styles.heartBtn}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    setRemovingItem(item);
-                                }}
+                                style={viewMode === "grid" ? styles.gridCard : styles.listCard}
+                                onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
                             >
-                                <Ionicons name="heart" size={20} color="#7C3AED" />
+                                <Image
+                                    source={{ uri: resolveImageUrl(item.event.coverImage) }}
+                                    style={viewMode === "grid" ? styles.gridImage : styles.listImage}
+                                />
+                                {(!item.event.price || item.event.price === "0") && (
+                                    <View style={styles.freeBadge}>
+                                        <ThemedText style={styles.freeText}>FREE</ThemedText>
+                                    </View>
+                                )}
+                                <View style={viewMode === "grid" ? styles.gridInfo : styles.listInfo}>
+                                    <ThemedText style={styles.eventTitle} numberOfLines={1}>{item.event.title}</ThemedText>
+                                    <ThemedText style={styles.eventDate}>
+                                        {safeFormat(item.event.startDate, "EEE, MMM d · hh:mm a")}
+                                    </ThemedText>
+                                    <View style={styles.locationContainer}>
+                                        <Ionicons name="location" size={12} color="#7C3AED" />
+                                        <ThemedText style={styles.locationText} numberOfLines={1}>
+                                            {item.event.location || "Online"}
+                                        </ThemedText>
+                                    </View>
+                                </View>
+                                <Pressable
+                                    style={styles.heartBtn}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        setRemovingItem(item);
+                                    }}
+                                >
+                                    <Ionicons name="heart" size={20} color="#7C3AED" />
+                                </Pressable>
                             </Pressable>
-                        </Pressable>
-                    </Animated.View>
-                )}
+                        </Animated.View>
+                    );
+                }}
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
                         <Ionicons name="heart-outline" size={80} color="#374151" />
@@ -204,7 +221,7 @@ export default function FavoritesScreen({ navigation }: any) {
                                 <View style={styles.previewInfo}>
                                     <ThemedText style={styles.previewTitle}>{removingItem.event.title}</ThemedText>
                                     <ThemedText style={styles.previewDate}>
-                                        {format(new Date(removingItem.event.startDate), "EEE, MMM d · hh:mm a")}
+                                        {safeFormat(removingItem.event.startDate, "EEE, MMM d · hh:mm a")}
                                     </ThemedText>
                                     <View style={styles.locationContainer}>
                                         <Ionicons name="location" size={12} color="#7C3AED" />
@@ -220,7 +237,7 @@ export default function FavoritesScreen({ navigation }: any) {
                             </Pressable>
                             <Pressable
                                 style={styles.confirmBtn}
-                                onPress={() => removeMutation.mutate(removingItem.id)}
+                                onPress={() => removeMutation.mutate(removingItem.eventId)}
                             >
                                 <ThemedText style={styles.confirmBtnText}>Yes, Remove</ThemedText>
                             </Pressable>

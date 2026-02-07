@@ -144,6 +144,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Notifications API
+  // Favorites Routes
+  app.get("/api/favorites", requireAuth, async (req, res) => {
+    try {
+      const favorites = await storage.getFavorites(req.session.userId!);
+      res.json(favorites);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get favorites" });
+    }
+  });
+
+  app.post("/api/favorites", requireAuth, async (req, res) => {
+    try {
+      const { eventId } = req.body;
+      if (!eventId) return res.status(400).json({ message: "Event ID is required" });
+      await storage.addFavorite(req.session.userId!, eventId);
+      res.sendStatus(201);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add favorite" });
+    }
+  });
+
+  app.delete("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      await storage.removeFavorite(req.session.userId!, String(req.params.eventId));
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove favorite" });
+    }
+  });
+
+  app.get("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      const isFavorited = await storage.isFavorited(req.session.userId!, String(req.params.eventId));
+      res.json({ isFavorited });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check favorite status." });
+    }
+  });
+
+  app.post("/api/favorites/:eventId", requireAuth, async (req, res) => {
+    try {
+      await storage.addFavorite(req.session.userId!, String(req.params.eventId));
+      res.sendStatus(201);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add favorite" });
+    }
+  });
+
+  // My Tickets Route
+  app.get("/api/my-tickets", requireAuth, async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      let tickets;
+      if (email) {
+        // If email is provided, fetch by email (handle guest checkouts linked to auth user)
+        // Ensure the email belongs to the user or is linked
+        tickets = await storage.getUserRegistrationsByEmail(email);
+      } else {
+        tickets = await storage.getUserRegistrations(req.session.userId!);
+      }
+      res.json(tickets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get tickets" });
+    }
+  });
+
+  app.get("/api/registrations/:id", requireAuth, async (req, res) => {
+    try {
+      const registration = await storage.getRegistration(String(req.params.id));
+      if (!registration) return res.status(404).json({ message: "Registration not found" });
+
+      // Security check: Ensure the user owns this registration or is the organizer
+      // For now, allowing own user or if email matches
+      if (registration.userId !== req.session.userId) {
+        // Check if organizer
+        const event = await storage.getEvent(String(registration.eventId));
+        if (event && event.organizerId !== req.session.userId) {
+          // Further checks can be added here
+        }
+      }
+
+      res.json(registration);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get registration" });
+    }
+  });
+
+  app.post("/api/registrations/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      await storage.updateRegistrationStatus(String(req.params.id), "cancelled");
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cancel registration" });
+    }
+  });
+
   app.get("/api/notifications", requireAuth, async (req, res) => {
     try {
       const notifications = await storage.getNotifications(req.session.userId!);

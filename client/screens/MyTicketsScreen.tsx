@@ -20,6 +20,17 @@ const { width } = Dimensions.get("window");
 
 const TABS = ["Upcoming", "Completed", "Cancelled"];
 
+const safeFormat = (date: any, fmt: string) => {
+  try {
+    if (!date) return "TBD";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "Invalid Date";
+    return format(d, fmt);
+  } catch (e) {
+    return "TBD";
+  }
+};
+
 export default function MyTicketsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -45,7 +56,11 @@ export default function MyTicketsScreen({ navigation }: any) {
     if (!tickets) return [];
     const now = new Date();
     return tickets.filter(t => {
-      const eventDate = t.event?.startDate ? new Date(t.event.startDate) : null;
+      if (!t.event) return false; // Skip tickets with missing event data
+      const eventDate = t.event.startDate ? new Date(t.event.startDate) : null;
+      // Handle invalid date
+      if (eventDate && isNaN(eventDate.getTime())) return false;
+
       if (activeTab === "Upcoming") return t.status !== 'cancelled' && eventDate && eventDate >= now;
       if (activeTab === "Completed") return (eventDate && eventDate < now && t.status !== 'cancelled') || t.status === 'checked_in';
       if (activeTab === "Cancelled") return t.status === 'cancelled';
@@ -133,75 +148,78 @@ export default function MyTicketsScreen({ navigation }: any) {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 100 }}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 100)} style={styles.ticketWrapper}>
-            <View style={styles.ticketCard}>
-              <View style={styles.ticketMain}>
-                <Image source={{ uri: resolveImageUrl(item.event.coverImage) }} style={styles.eventThumb} />
-                <View style={styles.ticketInfo}>
-                  <ThemedText style={styles.eventTitle}>{item.event.title}</ThemedText>
-                  <ThemedText style={styles.eventDate}>
-                    {format(new Date(item.event.startDate), "EEE, MMM d · hh:mm a")}
-                  </ThemedText>
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location" size={12} color="#9CA3AF" />
-                    <ThemedText style={styles.locationText} numberOfLines={1}>
-                      {item.event.location}
+        renderItem={({ item, index }) => {
+          if (!item.event) return null;
+          return (
+            <Animated.View entering={FadeInDown.delay(index * 100)} style={styles.ticketWrapper}>
+              <View style={styles.ticketCard}>
+                <View style={styles.ticketMain}>
+                  <Image source={{ uri: resolveImageUrl(item.event.coverImage) }} style={styles.eventThumb} />
+                  <View style={styles.ticketInfo}>
+                    <ThemedText style={styles.eventTitle}>{item.event.title}</ThemedText>
+                    <ThemedText style={styles.eventDate}>
+                      {safeFormat(item.event.startDate, "EEE, MMM d · hh:mm a")}
                     </ThemedText>
-                    <View style={[
-                      styles.statusBadge,
-                      item.status === 'cancelled' ? styles.statusCancelled : styles.statusPaid
-                    ]}>
-                      <ThemedText style={styles.statusText}>
-                        {item.status === 'cancelled' ? 'Cancelled' : 'Paid'}
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location" size={12} color="#9CA3AF" />
+                      <ThemedText style={styles.locationText} numberOfLines={1}>
+                        {item.event.location || "Online"}
                       </ThemedText>
+                      <View style={[
+                        styles.statusBadge,
+                        item.status === 'cancelled' ? styles.statusCancelled : styles.statusPaid
+                      ]}>
+                        <ThemedText style={styles.statusText}>
+                          {item.status === 'cancelled' ? 'Cancelled' : 'Paid'}
+                        </ThemedText>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.ticketActions}>
-                {activeTab === "Upcoming" && (
-                  <>
-                    <Pressable
-                      style={styles.actionBtnSecondary}
-                      onPress={() => setCancelItem(item)}
-                    >
-                      <ThemedText style={styles.actionTextSecondary}>Cancel Booking</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={styles.actionBtnPrimary}
-                      onPress={() => navigation.navigate("TicketView", { registrationId: item.id })}
-                    >
-                      <ThemedText style={styles.actionTextPrimary}>View E-Ticket</ThemedText>
-                    </Pressable>
-                  </>
-                )}
-                {activeTab === "Completed" && (
-                  <>
-                    <Pressable
-                      style={styles.actionBtnSecondary}
-                      onPress={() => setReviewItem(item)}
-                    >
-                      <ThemedText style={styles.actionTextSecondary}>Leave a Review</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={styles.actionBtnPrimary}
-                      onPress={() => navigation.navigate("TicketView", { registrationId: item.id })}
-                    >
-                      <ThemedText style={styles.actionTextPrimary}>View E-Ticket</ThemedText>
-                    </Pressable>
-                  </>
-                )}
-                {activeTab === "Cancelled" && (
-                  <View style={styles.cancelledStatusRow}>
-                    <ThemedText style={styles.cancelledDetail}>This booking was cancelled</ThemedText>
-                  </View>
-                )}
+                <View style={styles.ticketActions}>
+                  {activeTab === "Upcoming" && (
+                    <>
+                      <Pressable
+                        style={styles.actionBtnSecondary}
+                        onPress={() => setCancelItem(item)}
+                      >
+                        <ThemedText style={styles.actionTextSecondary}>Cancel Booking</ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={styles.actionBtnPrimary}
+                        onPress={() => navigation.navigate("TicketView", { registrationId: item.id })}
+                      >
+                        <ThemedText style={styles.actionTextPrimary}>View E-Ticket</ThemedText>
+                      </Pressable>
+                    </>
+                  )}
+                  {activeTab === "Completed" && (
+                    <>
+                      <Pressable
+                        style={styles.actionBtnSecondary}
+                        onPress={() => setReviewItem(item)}
+                      >
+                        <ThemedText style={styles.actionTextSecondary}>Leave a Review</ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={styles.actionBtnPrimary}
+                        onPress={() => navigation.navigate("TicketView", { registrationId: item.id })}
+                      >
+                        <ThemedText style={styles.actionTextPrimary}>View E-Ticket</ThemedText>
+                      </Pressable>
+                    </>
+                  )}
+                  {activeTab === "Cancelled" && (
+                    <View style={styles.cancelledStatusRow}>
+                      <ThemedText style={styles.cancelledDetail}>This booking was cancelled</ThemedText>
+                    </View>
+                  )}
+                </View>
               </View>
-            </View>
-          </Animated.View>
-        )}
+            </Animated.View>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <View style={styles.illustration}>
