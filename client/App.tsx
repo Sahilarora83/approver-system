@@ -175,7 +175,7 @@ function AppContent() {
       <NavigationContainer linking={linking} ref={navigationRef}>
         <RootStackNavigator />
       </NavigationContainer>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
     </GestureHandlerRootView>
   );
 }

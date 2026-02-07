@@ -1,112 +1,136 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Text, Platform } from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { StyleSheet, View, Text, Platform, Dimensions } from "react-native";
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
-    withDelay,
     withTiming,
     withRepeat,
-    interpolateColor
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSocket } from "@/contexts/SocketContext";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
+const { width } = Dimensions.get("window");
 
 export const ConnectionStatus = () => {
     const { isConnected } = useSocket();
     const insets = useSafeAreaInsets();
-    const translateY = useSharedValue(-100);
-    const [lastStatus, setLastStatus] = useState<boolean | null>(null);
+    const translateY = useSharedValue(-120);
+    const [status, setStatus] = useState<"online" | "offline" | "connecting">("online");
+    const lastReportedStatus = useRef<boolean | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        // Only show if status has changed (to avoid showing on first load if already connected)
-        if (lastStatus !== null && lastStatus !== isConnected) {
-            translateY.value = withSpring(insets.top + 10, { damping: 15 });
+        // Clear any existing timer when isConnected change
+        if (timerRef.current) clearTimeout(timerRef.current);
 
-            // Auto hide after 3 seconds if connected, stay if disconnected
+        // Logic to prevent "Baar Baar" (flickering)
+        // We wait 1.5 seconds of consistent state before showing a change
+        timerRef.current = setTimeout(() => {
+            if (lastReportedStatus.current === isConnected) return;
+
             if (isConnected) {
-                const timer = setTimeout(() => {
-                    translateY.value = withSpring(-100);
-                }, 3000);
-                return () => clearTimeout(timer);
+                // Was it offline before?
+                if (lastReportedStatus.current === false) {
+                    setStatus("online");
+                    translateY.value = withSpring(0, { damping: 15 });
+
+                    // Hide after success
+                    setTimeout(() => {
+                        translateY.value = withSpring(-120);
+                    }, 3000);
+                }
+            } else {
+                // Show offline immediately or after tiny delay
+                setStatus("offline");
+                translateY.value = withSpring(0, { damping: 15 });
             }
-        } else if (lastStatus === null && !isConnected) {
-            // Show immediately if starting offline
-            translateY.value = withSpring(insets.top + 10);
-        }
+            lastReportedStatus.current = isConnected;
+        }, isConnected ? 500 : 1500); // Connects show faster, disconnects wait to be sure
 
-        setLastStatus(isConnected);
-    }, [isConnected, insets.top]);
-
-    const opacity = useSharedValue(1);
-
-    useEffect(() => {
-        if (!isConnected) {
-            opacity.value = withRepeat(
-                withTiming(0.6, { duration: 800 }),
-                -1,
-                true
-            );
-        } else {
-            opacity.value = withTiming(1);
-        }
-    }, [isConnected]);
-
-    const animatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ translateY: translateY.value }],
-            backgroundColor: isConnected ? "#10B981" : "#EF4444",
-            opacity: opacity.value,
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
         };
-    });
+    }, [isConnected, translateY]);
+
+    const pulseOpacity = useSharedValue(1);
+    useEffect(() => {
+        if (status === "offline") {
+            pulseOpacity.value = withRepeat(withTiming(0.7, { duration: 1000 }), -1, true);
+        } else {
+            pulseOpacity.value = withTiming(1);
+        }
+    }, [status]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }],
+        opacity: pulseOpacity.value,
+    }));
 
     return (
-        <Animated.View style={[styles.container, animatedStyle]}>
-            <View style={styles.content}>
-                <Feather
-                    name={isConnected ? "zap" : "zap-off"}
-                    size={14}
-                    color="#FFF"
-                />
-                <Text style={styles.text}>
-                    {isConnected ? "You are Online" : "You are Offline"}
-                </Text>
+        <Animated.View style={[styles.wrapper, animatedStyle, { height: insets.top + 45 }]}>
+            <LinearGradient
+                colors={status === "online" ? ["#10B981", "#059669"] : ["#EF4444", "#DC2626"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[StyleSheet.absoluteFill, styles.gradient]}
+            />
+            <View style={[styles.content, { paddingTop: insets.top }]}>
+                <View style={styles.pill}>
+                    <Feather
+                        name={status === "online" ? "check-circle" : "wifi-off"}
+                        size={14}
+                        color="#FFF"
+                    />
+                    <Text style={styles.text}>
+                        {status === "online" ? "Back Online" : "Waiting for stable connection..."}
+                    </Text>
+                </View>
             </View>
         </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    wrapper: {
         position: "absolute",
-        left: "25%",
-        right: "25%",
-        zIndex: 9999,
-        borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        ...Platform.select({
-            ios: {
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 10,
-            },
-            android: {
-                elevation: 10,
-            },
-        }),
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 99999,
+        width: width,
+        elevation: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+    },
+    gradient: {
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
     },
     content: {
+        flex: 1,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
+    },
+    pill: {
+        flexDirection: "row",
+        alignItems: "center",
         gap: 8,
+        backgroundColor: "rgba(0,0,0,0.15)",
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     text: {
         color: "#FFF",
-        fontSize: 13,
-        fontWeight: "800",
+        fontSize: 12,
+        fontWeight: "900",
+        letterSpacing: 0.5,
+        textTransform: "uppercase",
     },
 });

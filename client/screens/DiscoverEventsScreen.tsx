@@ -258,21 +258,34 @@ export default function DiscoverEventsScreen({ navigation }: any) {
     const ListHeader = useMemo(() => (
         <View style={styles.headerContent}>
             {/* User Profile Info */}
-            <View style={styles.userRow}>
-                <View style={styles.userInfo}>
-                    <Image
-                        source={{ uri: user?.profileImage ? resolveImageUrl(user.profileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "guest"}` }}
-                        style={styles.avatar}
-                    />
-                    <View style={styles.userText}>
-                        <ThemedText style={styles.greetingText}>{greeting}</ThemedText>
-                        <ThemedText style={styles.userName}>{user?.name || "Andrew Ainsley"}</ThemedText>
+            {/* Premium Header Design */}
+            <View style={styles.premiumHeader}>
+                <View style={styles.headerLeft}>
+                    <View style={styles.avatarWrapper}>
+                        <Image
+                            source={{ uri: user?.profileImage ? resolveImageUrl(user.profileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "guest"}` }}
+                            style={styles.avatar}
+                        />
+                        <View style={styles.onlinePing} />
+                    </View>
+                    <View style={styles.greetingContainer}>
+                        <ThemedText style={styles.helloText}>{greeting}</ThemedText>
+                        <ThemedText style={styles.userNameProfessional}>{user?.name || "Member"}</ThemedText>
                     </View>
                 </View>
-                <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.iconButton}>
-                    <Feather name="bell" size={24} color="#FFF" />
-                    <View style={styles.notifBadge} />
-                </Pressable>
+                <View style={styles.headerActions}>
+                    <Pressable onPress={() => navigation.navigate("Notifications")} style={styles.actionCircleBtn}>
+                        <Feather name="bell" size={20} color="#FFF" />
+                        <View style={styles.notifDot} />
+                    </Pressable>
+                </View>
+            </View>
+
+            {/* Location Selector (New) */}
+            <View style={styles.locationStrip}>
+                <Feather name="map-pin" size={12} color={COLORS.primary} />
+                <ThemedText style={styles.locationStripText}>{userCity}</ThemedText>
+                <Feather name="chevron-down" size={12} color={COLORS.textSecondary} />
             </View>
 
             {/* Search Bar */}
@@ -434,81 +447,131 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#111827",
     },
-    mainList: {
-        paddingBottom: 20,
-    },
-    headerContent: {
-        marginBottom: Spacing.lg,
-    },
-    userRow: {
+    // List styling
+    mainList: { paddingBottom: 20 },
+    headerContent: { marginBottom: Spacing.lg },
+
+    // Professional Header Styles
+    premiumHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: Spacing.lg,
-        marginTop: Spacing.md,
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        marginBottom: 8
     },
-    userInfo: {
+    headerLeft: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
+        gap: 12
+    },
+    avatarWrapper: {
+        position: 'relative',
     },
     avatar: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: "#374151",
+        borderWidth: 2,
+        borderColor: "rgba(124, 58, 237, 0.3)"
     },
-    userText: {
-        gap: 2,
+    onlinePing: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: COLORS.accent,
+        borderWidth: 2,
+        borderColor: COLORS.background
     },
-    greetingText: {
-        fontSize: 14,
-        color: "#9CA3AF",
+    greetingContainer: {
+        gap: 2
     },
-    userName: {
+    helloText: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+        fontWeight: "600",
+        textTransform: "uppercase",
+        letterSpacing: 1
+    },
+    userNameProfessional: {
         fontSize: 18,
-        fontWeight: "800",
-        color: "#FFF",
+        fontWeight: "900",
+        color: COLORS.text,
+        letterSpacing: -0.5
     },
-    iconButton: {
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12
+    },
+    actionCircleBtn: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: "#1F2937",
-        justifyContent: "center",
-        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.05)",
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.1)"
     },
-    notifBadge: {
-        position: "absolute",
+    notifDot: {
+        position: 'absolute',
         top: 12,
         right: 12,
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: "#EF4444",
-        borderWidth: 2,
-        borderColor: "#1F2937",
+        backgroundColor: "#FF4B4B",
+        borderWidth: 1.5,
+        borderColor: COLORS.background
     },
+    locationStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 20,
+        marginBottom: 20
+    },
+    locationStripText: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        fontWeight: "700"
+    },
+
+    // Search Bar Redesign
     searchBarContainer: {
-        paddingHorizontal: Spacing.lg,
-        marginTop: 24,
+        paddingHorizontal: 20,
+        marginBottom: 24,
     },
     searchBar: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#1F2937",
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderRadius: 20,
+        paddingHorizontal: 16,
         height: 56,
-        borderRadius: 28,
-        paddingHorizontal: 20,
-        gap: 12,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 2
     },
     searchInput: {
         flex: 1,
+        marginLeft: 12,
         color: "#FFF",
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: "500",
     },
     filterBarIcon: {
-        padding: 4,
+        padding: 8,
+        backgroundColor: "rgba(124, 58, 237, 0.1)",
+        borderRadius: 12
     },
     sectionTitleRow: {
         flexDirection: "row",

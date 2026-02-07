@@ -114,26 +114,25 @@ export default function NotificationsScreen({ navigation }: any) {
         const typeLabel = (item.type || 'system').toUpperCase().replace('_', ' ');
 
         return (
-            <Animated.View entering={FadeInUp.delay(index * 40).duration(400)}>
+            <Animated.View entering={FadeInUp.delay(index * 60).duration(500)}>
                 <Pressable
                     onPress={() => handlePress(item)}
                     style={({ pressed }) => [
                         styles.item,
                         {
                             transform: [{ scale: pressed ? 0.98 : 1 }],
-                            backgroundColor: item.read ? "rgba(31, 41, 55, 0.4)" : "rgba(124, 58, 237, 0.08)",
-                            borderColor: !item.read ? "rgba(124, 58, 237, 0.3)" : "rgba(255, 255, 255, 0.05)",
-                        },
-                        !item.read && Shadows.md
+                            backgroundColor: item.read ? "rgba(31, 41, 55, 0.4)" : "rgba(124, 58, 237, 0.05)",
+                            borderColor: !item.read ? "rgba(124, 58, 237, 0.4)" : "rgba(255, 255, 255, 0.08)",
+                        }
                     ]}
                 >
                     <View style={[styles.iconBox, { backgroundColor: bg }]}>
-                        <Icon name={icon as any} size={20} color={color} />
+                        <Icon name={icon as any} size={22} color={color} strokeWidth={2.5} />
                     </View>
 
                     <View style={styles.textContainer}>
                         <View style={styles.itemHeader}>
-                            <View style={[styles.typeBadge, { backgroundColor: `${color}20` }]}>
+                            <View style={[styles.typeBadge, { backgroundColor: `${color}15` }]}>
                                 <ThemedText style={[styles.typeBadgeText, { color: color }]}>{typeLabel}</ThemedText>
                             </View>
                             <ThemedText style={styles.timeText}>
@@ -156,8 +155,8 @@ export default function NotificationsScreen({ navigation }: any) {
                     </View>
 
                     {!item.read && (
-                        <View style={styles.unreadIndicator}>
-                            <View style={[styles.unreadDot, { backgroundColor: color }]} />
+                        <View style={styles.unreadDotContainer}>
+                            <View style={[styles.unreadDot, { backgroundColor: COLORS.primary }]} />
                         </View>
                     )}
                 </Pressable>
@@ -217,17 +216,17 @@ const styles = StyleSheet.create({
     },
     item: {
         flexDirection: "row",
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        marginBottom: 12,
+        padding: 18,
+        borderRadius: 24,
+        borderWidth: 1.5,
+        marginBottom: 16,
         alignItems: "center",
         gap: 16,
     },
     iconBox: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+        width: 56,
+        height: 56,
+        borderRadius: 18,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -239,72 +238,82 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        marginBottom: 4,
     },
     itemTitle: {
         fontSize: 16,
-        fontWeight: "600",
+        fontWeight: "700",
         color: COLORS.textSecondary,
         flex: 1,
         marginRight: 8,
+        letterSpacing: -0.3,
     },
     unreadTitle: {
-        fontWeight: "800",
+        fontWeight: "900",
         color: COLORS.text,
     },
     timeText: {
         fontSize: 11,
         color: COLORS.textSecondary,
-        opacity: 0.7,
+        fontWeight: "600",
+        opacity: 0.6,
     },
     itemBody: {
         fontSize: 14,
         lineHeight: 20,
         color: COLORS.textSecondary,
+        fontWeight: "500",
+    },
+    unreadDotContainer: {
+        justifyContent: "center",
+        paddingLeft: 4,
     },
     unreadDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 2,
+        borderColor: COLORS.background,
     },
     emptyContainer: {
         alignItems: "center",
         justifyContent: "center",
-        paddingTop: 140,
+        paddingTop: 120,
         paddingHorizontal: 40,
     },
     emptyIconCircle: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: "rgba(255,255,255,0.03)",
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: "rgba(124, 58, 237, 0.05)",
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 24,
+        marginBottom: 32,
+        borderWidth: 2,
+        borderColor: "rgba(124, 58, 237, 0.1)",
     },
     emptyTitle: {
-        fontSize: 22,
-        fontWeight: "800",
+        fontSize: 24,
+        fontWeight: "900",
         color: COLORS.text,
         marginBottom: 12,
+        letterSpacing: -0.5,
     },
     emptySub: {
         fontSize: 15,
         color: COLORS.textSecondary,
         textAlign: "center",
-        lineHeight: 22,
+        lineHeight: 24,
+        fontWeight: "500",
     },
     typeBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     typeBadgeText: {
         fontSize: 10,
         fontWeight: "900",
-        letterSpacing: 0.5,
-    },
-    unreadIndicator: {
-        justifyContent: "center",
-        alignItems: "center",
+        letterSpacing: 0.8,
     },
 });
