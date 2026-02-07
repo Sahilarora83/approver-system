@@ -40,6 +40,7 @@ export default function MyTicketsScreen({ navigation }: any) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
+  /* API Response Validation: Ensure array */
   const { data: tickets, isLoading, error } = useQuery<any[]>({
     queryKey: ["/api/my-tickets", user?.email],
     queryFn: async () => {
@@ -47,7 +48,8 @@ export default function MyTicketsScreen({ navigation }: any) {
         ? `/api/my-tickets?email=${encodeURIComponent(user.email)}`
         : '/api/my-tickets';
       const res = await apiRequest("GET", url);
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!user?.email,
   });
@@ -56,9 +58,8 @@ export default function MyTicketsScreen({ navigation }: any) {
     if (!tickets || !Array.isArray(tickets)) return [];
     const now = new Date();
     return tickets.filter(t => {
-      if (!t.event) return false; // Skip tickets with missing event data
+      if (!t.event) return false;
       const eventDate = t.event.startDate ? new Date(t.event.startDate) : null;
-      // Handle invalid date
       if (eventDate && isNaN(eventDate.getTime())) return false;
 
       if (activeTab === "Upcoming") return t.status !== 'cancelled' && eventDate && eventDate >= now;
@@ -92,6 +93,9 @@ export default function MyTicketsScreen({ navigation }: any) {
     }
   });
 
+  // ... (Header and View logic remains same) ...
+
+  // Render function start
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
@@ -252,7 +256,13 @@ export default function MyTicketsScreen({ navigation }: any) {
             </ThemedText>
             <Pressable
               style={styles.findBtn}
-              onPress={() => navigation.navigate("Explore")}
+              onPress={() => {
+                try {
+                  navigation.navigate("Explore");
+                } catch (e) {
+                  console.warn("Explore screen not found");
+                }
+              }}
             >
               <ThemedText style={styles.findBtnText}>Find Events</ThemedText>
             </Pressable>
@@ -267,7 +277,7 @@ export default function MyTicketsScreen({ navigation }: any) {
           <Animated.View entering={SlideInDown} exiting={SlideOutDown} style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <ThemedText style={styles.modalTitle}>Leave a Review</ThemedText>
-            <ThemedText style={styles.reviewSubTitle}>How was your experience with{"\n"}{reviewItem?.event.title}?</ThemedText>
+            <ThemedText style={styles.reviewSubTitle}>How was your experience with{"\n"}{reviewItem?.event?.title || "this event"}?</ThemedText>
 
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map(star => (
@@ -298,7 +308,15 @@ export default function MyTicketsScreen({ navigation }: any) {
               <Pressable
                 style={[styles.confirmBtn, rating === 0 && { opacity: 0.5 }]}
                 disabled={rating === 0}
-                onPress={() => reviewMutation.mutate({ eventId: reviewItem.eventId, rating, comment })}
+                onPress={() => {
+                  if (reviewItem && rating > 0) {
+                    reviewMutation.mutate({
+                      eventId: reviewItem.event?.id || reviewItem.eventId,
+                      rating,
+                      comment
+                    });
+                  }
+                }}
               >
                 <ThemedText style={styles.confirmBtnText}>Submit</ThemedText>
               </Pressable>
@@ -325,7 +343,11 @@ export default function MyTicketsScreen({ navigation }: any) {
               </Pressable>
               <Pressable
                 style={styles.confirmBtnDanger}
-                onPress={() => cancelMutation.mutate(cancelItem.id)}
+                onPress={() => {
+                  if (cancelItem?.id) {
+                    cancelMutation.mutate(cancelItem.id);
+                  }
+                }}
               >
                 <ThemedText style={styles.confirmBtnText}>Yes, Cancel</ThemedText>
               </Pressable>
