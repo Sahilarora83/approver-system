@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -82,9 +83,16 @@ export default function ParticipantTabNavigator() {
       <Tab.Screen
         name="Home"
         component={DiscoverStack}
-        options={{
+        options={({ route }) => ({
           tabBarIcon: renderTabIcon("home"),
-        }}
+          tabBarStyle: ((route) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? "";
+            if (["ParticipantEventDetail", "Attendees"].includes(routeName)) {
+              return { display: "none" };
+            }
+            return screenOptions.tabBarStyle;
+          })(route),
+        })}
       />
       <Tab.Screen
         name="Explore"

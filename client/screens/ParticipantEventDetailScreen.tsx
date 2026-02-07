@@ -76,34 +76,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
 
-    // ✅ Scroll animation value
-    const scrollY = useSharedValue(0);
     const scrollViewRef = useAnimatedRef<Animated.ScrollView>();
-
-    // ✅ Scroll handler for button animation
-    const scrollHandler = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            scrollY.value = event.contentOffset.y;
-        },
-    });
-
-    // ✅ Animated button style - slides up on scroll, down on stop
-    const buttonAnimatedStyle = useAnimatedStyle(() => {
-        // Button shows at bottom initially (translateY = 0)
-        // On scroll down, button slides down out of view (translateY = 100)
-        // On scroll stop, button slides back up (translateY = 0)
-
-        const translateY = interpolate(
-            scrollY.value,
-            [0, 100, 200],
-            [0, 80, 0], // Start visible, hide on scroll, show again
-            Extrapolate.CLAMP
-        );
-
-        return {
-            transform: [{ translateY: withSpring(translateY, { damping: 15, stiffness: 100 }) }],
-        };
-    });
 
     // Fetch Event Details
     const { data: event, isLoading, error: eventError } = useQuery({
@@ -294,10 +267,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
             {/* ✅ Animated ScrollView */}
             <Animated.ScrollView
                 ref={scrollViewRef}
-                onScroll={scrollHandler}
-                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 120 }}
+                contentContainerStyle={{ paddingBottom: 150 }}
             >
                 {/* Hero Carousel */}
                 <View style={styles.heroContainer}>
@@ -416,8 +387,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                     {event.endDate ? safeFormat(event.endDate, "HH:mm") : "Late"} (GMT +07:00)
                                 </ThemedText>
                                 <Pressable style={styles.pillActionBtn}>
-                                    <Ionicons name="add-circle-outline" size={16} color="#FFF" />
-                                    <ThemedText style={styles.pillActionText}>Add to My Calendar</ThemedText>
+                                    <Feather name="calendar" size={14} color="#FFF" />
+                                    <ThemedText style={styles.pillActionText}>Add Calendar</ThemedText>
                                 </Pressable>
                             </View>
                         </View>
@@ -632,12 +603,11 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 </View>
             </Animated.ScrollView>
 
-            {/* ✅ Animated Bottom Button - Slides based on scroll */}
-            <Animated.View
+            {/* Sticky Bottom Booking Button */}
+            <View
                 style={[
                     styles.footer,
-                    { paddingBottom: insets.bottom + 16 },
-                    buttonAnimatedStyle, // Apply scroll animation
+                    { paddingBottom: Math.max(insets.bottom, 20) }
                 ]}
             >
                 <Pressable
@@ -661,7 +631,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         </ThemedText>
                     )}
                 </Pressable>
-            </Animated.View>
+            </View>
 
             {/* Gallery Viewer Modal */}
             <Modal
@@ -684,7 +654,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     />
                 </View>
             </Modal>
-        </ThemedView>
+        </ThemedView >
     );
 }
 
@@ -727,7 +697,7 @@ const styles = StyleSheet.create({
     activeDot: { backgroundColor: COLORS.primary },
 
     // Main Content
-    content: { marginTop: -45, paddingHorizontal: 24 },
+    content: { marginTop: -25, paddingHorizontal: 24 },
     titleSection: { marginBottom: 24 },
     mainTitle: { fontSize: 30, fontWeight: "900", color: "#FFF", lineHeight: 38, marginBottom: 12 },
     metaBadgeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -773,14 +743,16 @@ const styles = StyleSheet.create({
     pillActionBtn: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
-        backgroundColor: COLORS.primary,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
+        gap: 6,
+        backgroundColor: "rgba(88, 86, 214, 0.15)",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
         alignSelf: "flex-start",
+        borderWidth: 1,
+        borderColor: "rgba(88, 86, 214, 0.3)",
     },
-    pillActionText: { color: "#FFF", fontSize: 12, fontWeight: "800" },
+    pillActionText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
 
     // Organizer
     organizerSection: { marginBottom: 24 },
@@ -788,9 +760,19 @@ const styles = StyleSheet.create({
     organizerAvatar: { width: 50, height: 50, borderRadius: 20 },
     organizerName: { fontSize: 16, fontWeight: "800", color: "#FFF" },
     organizerLabel: { fontSize: 13, color: COLORS.textMuted, fontWeight: "500" },
-    followBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14, backgroundColor: COLORS.primary },
-    followBtnActive: { backgroundColor: "rgba(255,255,255,0.1)" },
-    followBtnText: { color: "#FFF", fontSize: 14, fontWeight: "800" },
+    followBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 16,
+        backgroundColor: COLORS.primary,
+        borderWidth: 1,
+        borderColor: COLORS.primary
+    },
+    followBtnActive: {
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderColor: "rgba(255,255,255,0.2)"
+    },
+    followBtnText: { color: "#FFF", fontSize: 13, fontWeight: "900" },
 
     // About
     sectionHeader: {
@@ -868,9 +850,10 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "rgba(15, 17, 23, 0.98)",
+        backgroundColor: "rgba(15, 17, 23, 0.95)",
         paddingHorizontal: 24,
         paddingTop: 16,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 24,
         borderTopWidth: 1,
         borderTopColor: "rgba(255,255,255,0.05)",
         zIndex: 10000,
