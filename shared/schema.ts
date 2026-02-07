@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   bio: text("bio"),
   profileImage: text("profile_image"),
   pushToken: text("push_token"),
+  settings: jsonb("settings").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -155,7 +155,14 @@ export default function ProfileScreen({ navigation }: any) {
           />
           <MenuItem icon="help-circle" label="Help Center" onPress={() => safeNavigate("HelpCenter")} />
           <MenuItem icon="users" label="Invite Friends" onPress={() => safeNavigate("InviteFriends")} />
-          <MenuItem icon="star" label="Rate us" onPress={() => Alert.alert("Rate Us", "Start rating feature coming soon!")} />
+          <MenuItem
+            icon="star"
+            label="Rate us"
+            onPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Rate Us", "Thank you for your interest! The App Store rating feature will be available once the app is published.");
+            }}
+          />
         </View>
 
         {/* Logout */}

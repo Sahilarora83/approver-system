@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect } from "react";
+import React, { useState, useLayoutEffect, useEffect } from "react";
 import { StyleSheet, View, ScrollView, Switch, Pressable, TextInput, FlatList, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
@@ -7,6 +7,9 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import Animated, { FadeInRight, FadeInUp } from "react-native-reanimated";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/query-client";
+import * as Haptics from "expo-haptics";
 
 const Header = ({ title, navigation }: any) => {
     const { theme } = useTheme();
@@ -49,7 +52,45 @@ export const NotificationSettingsScreen = ({ navigation }: any) => {
         updates: true,
     });
 
-    const toggle = (key: keyof typeof settings) => setSettings(p => ({ ...p, [key]: !p[key] }));
+    const { data: savedSettings, isLoading } = useQuery({
+        queryKey: ["/api/user/settings"],
+        queryFn: async () => {
+            const res = await apiRequest("GET", "/api/user/settings");
+            return res.json();
+        }
+    });
+
+    useEffect(() => {
+        if (savedSettings) {
+            setSettings(prev => ({ ...prev, ...savedSettings }));
+        }
+    }, [savedSettings]);
+
+    const settingsMutation = useMutation({
+        mutationFn: async (newSettings: any) => {
+            await apiRequest("POST", "/api/user/settings", newSettings);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+    });
+
+    const toggle = (key: keyof typeof settings) => {
+        const newSettings = { ...settings, [key]: !settings[key] };
+        setSettings(newSettings);
+        settingsMutation.mutate(newSettings);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    if (isLoading) {
+        return (
+            <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Header title="Notification" navigation={navigation} />
+                <ThemedText>Loading...</ThemedText>
+            </ThemedView>
+        );
+    }
 
     return (
         <ThemedView style={styles.container}>

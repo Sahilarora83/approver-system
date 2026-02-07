@@ -10,20 +10,39 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, queryClient } from "@/lib/query-client";
+import { useSocket } from "@/contexts/SocketContext";
 
 export default function TicketViewScreen({ route, navigation }: any) {
   const { registrationId } = route.params;
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { socket } = useSocket();
 
   const { data: ticket, isLoading } = useQuery<any>({
     queryKey: ["/api/registrations", registrationId],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/registrations/${registrationId}`);
       return res.json();
-    }
+    },
+    refetchInterval: 5000, // Fallback for real-time
   });
+
+  React.useEffect(() => {
+    if (socket) {
+      socket.on("ticket-status-changed", (data: any) => {
+        if (data.registrationId === registrationId) {
+          queryClient.invalidateQueries({ queryKey: ["/api/registrations", registrationId] });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          console.log("[Socket] Ticket status updated in real-time");
+        }
+      });
+
+      return () => {
+        socket.off("ticket-status-changed");
+      };
+    }
+  }, [socket, registrationId]);
 
   const handleShare = async () => {
     if (ticket?.ticketLink) {

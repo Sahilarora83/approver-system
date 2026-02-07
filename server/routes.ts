@@ -1143,15 +1143,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/registrations/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const regId = String(req.params.id);
+      const registration = await storage.getRegistration(regId);
+      if (!registration) return res.status(404).json({ message: "Registration not found" });
+
+      if (registration.userId !== req.session.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const updated = await storage.updateRegistrationStatus(regId, "cancelled");
+
+      // Notify organizer
+      const event = await storage.getEvent(registration.eventId);
+      if (event) {
+        await notifyUser(event.organizerId, "Booking Cancelled", `${registration.name} has cancelled their booking for "${event.title}"`, "cancellation", event.id);
+      }
+
+      res.json({ success: true, registration: updated });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cancel registration" });
+    }
+  });
+
   app.get("/api/my-tickets", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.session.userId!);
+      const userId = req.session.userId as string;
+      const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
       const tickets = await storage.getUserRegistrationsByEmail(user.email);
       res.json(tickets);
     } catch (error) {
       res.status(500).json({ message: "Failed to get tickets" });
+    }
+  });
+
+  app.get("/api/user/settings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId as string);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user.settings || {});
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/user/settings", requireAuth, async (req, res) => {
+    try {
+      const settings = req.body;
+      await storage.updateUser(req.session.userId as string, { settings });
+      res.json({ success: true, settings });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update settings" });
     }
   });
 
@@ -1245,6 +1290,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to unfollow user" });
+    }
+  });
+
+  app.post("/api/reviews", requireAuth, async (req, res) => {
+    try {
+      const { eventId, rating, comment } = req.body;
+      if (!eventId || !rating) {
+        return res.status(400).json({ message: "Event ID and rating are required" });
+      }
+
+      const review = await storage.createReview({
+        eventId,
+        userId: req.session.userId!,
+        rating: Number(rating),
+        comment: comment || null,
+      });
+
+      // Optional: Notify organizer about new review
+      const event = await storage.getEvent(eventId);
+      if (event) {
+        await notifyUser(event.organizerId, "New Review", `Someone left a ${rating}-star review for "${event.title}"`, "new_review", eventId);
+      }
+
+      res.status(201).json(review);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create review" });
+    }
+  });
+
+  app.get("/api/events/:id/reviews", async (req, res) => {
+    try {
+      const reviews = await storage.getReviews(req.params.id);
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get reviews" });
     }
   });
 

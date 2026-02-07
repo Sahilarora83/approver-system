@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Share, FlatList, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
+import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Share, FlatList, NativeSyntheticEvent, NativeScrollEvent, Modal } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { Shadows, Spacing, BorderRadius } from "@/constants/theme";
 
 const { width, height } = Dimensions.get("window");
 const IMAGE_HEIGHT = height * 0.55;
+const GOOGLE_MAPS_API_KEY = "AIzaSyBH1Cl0wkbKTVR5Qmyv8_3UGZe-Er_nEDE";
 
 const COLORS = {
     background: "#0F1117", // Deeper dark from screenshot
@@ -45,6 +46,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const { user } = useAuth();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
 
     // Fetch Event Details
     const { data: event, isLoading } = useQuery({
@@ -175,6 +177,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     if (!event) return null;
 
     const gallery = event.gallery && Array.isArray(event.gallery) && event.gallery.length > 0 ? event.gallery : [event.coverImage];
+    const lat = event.latitude || "40.7128";
+    const lng = event.longitude || "-74.0060";
+    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=14&size=600x300&maptype=roadmap&markers=color:purple%7C${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0x212121&style=feature:poi|element:geometry|color:0x333333&style=feature:road|element:geometry|color:0x444444&style=feature:water|element:geometry|color:0x111111`;
 
     return (
         <ThemedView style={styles.container}>
@@ -300,8 +305,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 <Ionicons name="location" size={20} color={COLORS.primary} />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <ThemedText style={styles.infoLabelTitle}>{event.location || "Grand Park, New York City, US"}</ThemedText>
-                                <ThemedText style={styles.infoLabelSubtitle} numberOfLines={2}>{event.address || "Grand City St. 100, New York, United States."}</ThemedText>
+                                <ThemedText style={styles.infoLabelTitle}>{event.location || "Venue Location"}</ThemedText>
+                                <ThemedText style={styles.infoLabelSubtitle} numberOfLines={2}>{event.address || event.location || "Address not provided"}</ThemedText>
                                 <Pressable
                                     style={styles.pillActionBtn}
                                     onPress={() => {
@@ -326,7 +331,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 style={styles.organizerAvatar}
                             />
                             <View style={{ flex: 1 }}>
-                                <ThemedText style={styles.organizerName}>{event.organizerName || "World of Music"}</ThemedText>
+                                <ThemedText style={styles.organizerName}>{event.organizerName || event.hostedBy || "Organizer"}</ThemedText>
                                 <ThemedText style={styles.organizerLabel}>Organizer</ThemedText>
                             </View>
                             <Pressable
@@ -352,16 +357,18 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     {/* Gallery Section */}
                     <View style={[styles.sectionHeader, { marginTop: 24 }]}>
                         <ThemedText style={styles.sectionHeading}>Gallery (Pre-Event)</ThemedText>
-                        <Pressable><ThemedText style={styles.seeAllLink}>See All</ThemedText></Pressable>
+                        <Pressable onPress={() => gallery.length > 0 && setSelectedGalleryImage(gallery[0])}><ThemedText style={styles.seeAllLink}>See All</ThemedText></Pressable>
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryContainer}>
                         {(gallery as string[]).map((img: string, i: number) => (
-                            <Image key={i} source={{ uri: resolveImageUrl(img) }} style={styles.galleryThumb} />
+                            <Pressable key={i} onPress={() => setSelectedGalleryImage(img)}>
+                                <Image source={{ uri: resolveImageUrl(img) }} style={styles.galleryThumb} />
+                            </Pressable>
                         ))}
                         {gallery.length > 2 && (
-                            <View style={styles.galleryMoreOverlay}>
-                                <ThemedText style={styles.moreText}>20+</ThemedText>
-                            </View>
+                            <Pressable style={styles.galleryMoreOverlay} onPress={() => setSelectedGalleryImage(gallery[0])}>
+                                <ThemedText style={styles.moreText}>{gallery.length}+</ThemedText>
+                            </Pressable>
                         )}
                     </ScrollView>
 
@@ -371,22 +378,22 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     </View>
                     <View style={styles.locAddressRow}>
                         <Ionicons name="location" size={16} color={COLORS.primary} />
-                        <ThemedText style={styles.addressText}>{event.address || "Grand City St. 100, New York, United States."}</ThemedText>
+                        <ThemedText style={styles.addressText}>{event.address || event.location || "Venue Address"}</ThemedText>
                     </View>
                     <View style={styles.mapContainer}>
-                        <Image
-                            source={{ uri: "https://api.mapbox.com/styles/v1/mapbox/dark-v10/static/-122.4194,37.7749,12/600x300?access_token=pk.eyJ1IjoiYmFycnljb2xsaW5zIiwiYSI6ImNrdHByNjFwajBoeWIyd3BndWd6NjR3bmIifQ.X9_3S4Z4-x4P5J8I_q6w5g" }}
-                            style={styles.mapImg}
-                        />
-                        <View style={styles.mapPinContainer}>
-                            <View style={styles.pinInner}>
-                                <Image
-                                    source={{ uri: event.coverImage ? resolveImageUrl(event.coverImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=music` }}
-                                    style={styles.pinAvatar}
-                                />
-                            </View>
-                            <View style={styles.pinPointer} />
-                        </View>
+                        <Pressable
+                            style={StyleSheet.absoluteFill}
+                            onPress={() => {
+                                const query = encodeURIComponent(event.address || event.location || `${lat},${lng}`);
+                                const url = Platform.select({
+                                    ios: `maps:0,0?q=${query}`,
+                                    android: `geo:0,0?q=${query}`
+                                });
+                                if (url) Linking.openURL(url);
+                            }}
+                        >
+                            <Image source={{ uri: staticMapUrl }} style={styles.mapImg} />
+                        </Pressable>
                     </View>
 
                     {/* Similar Events */}
@@ -434,6 +441,15 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                     )}
                 </Pressable>
             </View>
+            {/* Gallery Viewer Modal */}
+            <Modal visible={!!selectedGalleryImage} transparent animationType="fade" onRequestClose={() => setSelectedGalleryImage(null)}>
+                <View style={styles.modalOverlay}>
+                    <Pressable style={styles.modalClose} onPress={() => setSelectedGalleryImage(null)}>
+                        <Ionicons name="close" size={30} color="#FFF" />
+                    </Pressable>
+                    <Image source={{ uri: resolveImageUrl(selectedGalleryImage || "") }} style={styles.fullImage} contentFit="contain" />
+                </View>
+            </Modal>
         </ThemedView>
     );
 }
@@ -538,37 +554,16 @@ const styles = StyleSheet.create({
     // Map
     locAddressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
     addressText: { fontSize: 14, color: COLORS.textMuted, fontWeight: "600" },
-    mapContainer: { width: '100%', height: 180, borderRadius: 24, overflow: 'hidden', position: 'relative' },
+    mapContainer: { width: '100%', height: 180, borderRadius: 24, overflow: 'hidden', backgroundColor: '#1E212B' },
     mapImg: { width: '100%', height: '100%' },
-    mapPinContainer: { position: 'absolute', top: '35%', left: '45%', alignItems: 'center' },
-    pinInner: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: COLORS.primary, borderWidth: 3, borderColor: "rgba(88, 86, 214, 0.4)",
-        justifyContent: 'center', alignItems: 'center'
-    },
-    pinAvatar: { width: 34, height: 34, borderRadius: 17 },
-    pinPointer: {
-        width: 0, height: 0,
-        borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 12,
-        borderLeftColor: 'transparent', borderRightColor: 'transparent',
-        borderTopColor: COLORS.primary, marginTop: -2
-    },
-
-    // Similar Events
     similarList: { gap: 14 },
     similarEventCard: { width: 250, height: 150, borderRadius: 20, overflow: 'hidden' },
     similarEvtImg: { width: '100%', height: '100%' },
     similarEvtTitle: { position: 'absolute', bottom: 12, left: 16, color: '#FFF', fontWeight: "800", fontSize: 15 },
-
-    // Footer
-    footer: {
-        position: 'absolute', bottom: 0, width: '100%',
-        backgroundColor: 'rgba(15, 17, 23, 0.98)', paddingHorizontal: 24,
-        paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)"
-    },
-    bookNowBtn: {
-        backgroundColor: COLORS.primary, height: 58, borderRadius: 29,
-        justifyContent: 'center', alignItems: 'center', ...Shadows.lg
-    },
-    bookNowBtnText: { color: '#FFF', fontSize: 18, fontWeight: "900" }
+    footer: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'rgba(15, 17, 23, 0.98)', paddingHorizontal: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
+    bookNowBtn: { backgroundColor: COLORS.primary, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
+    bookNowBtnText: { color: '#FFF', fontSize: 18, fontWeight: "900" },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
+    fullImage: { width: width, height: height * 0.8 }
 });
