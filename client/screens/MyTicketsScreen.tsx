@@ -40,7 +40,7 @@ export default function MyTicketsScreen({ navigation }: any) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
-  const { data: tickets, isLoading } = useQuery<any[]>({
+  const { data: tickets, isLoading, error } = useQuery<any[]>({
     queryKey: ["/api/my-tickets", user?.email],
     queryFn: async () => {
       const url = user?.email
@@ -53,7 +53,7 @@ export default function MyTicketsScreen({ navigation }: any) {
   });
 
   const filteredTickets = useMemo(() => {
-    if (!tickets) return [];
+    if (!tickets || !Array.isArray(tickets)) return [];
     const now = new Date();
     return tickets.filter(t => {
       if (!t.event) return false; // Skip tickets with missing event data
@@ -137,6 +137,22 @@ export default function MyTicketsScreen({ navigation }: any) {
     return (
       <View style={styles.loadingWrapper}>
         <ActivityIndicator size="large" color="#7C3AED" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="alert-circle-outline" size={80} color="#EF4444" />
+        <ThemedText style={styles.emptyTitle}>Error Loading Tickets</ThemedText>
+        <ThemedText style={styles.emptySub}>{(error as Error).message || "Could not fetch your tickets."}</ThemedText>
+        <Pressable
+          style={[styles.confirmBtn, { marginTop: 20, width: 200 }]}
+          onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/my-tickets"] })}
+        >
+          <ThemedText style={styles.confirmBtnText}>Try Again</ThemedText>
+        </Pressable>
       </View>
     );
   }

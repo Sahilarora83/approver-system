@@ -43,7 +43,7 @@ export default function FavoritesScreen({ navigation }: any) {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [removingItem, setRemovingItem] = useState<any>(null);
 
-    const { data: favorites, isLoading } = useQuery<any[]>({
+    const { data: favorites, isLoading, error } = useQuery<any[]>({
         queryKey: ["/api/favorites"],
         queryFn: async () => {
             const res = await apiRequest("GET", "/api/favorites");
@@ -62,15 +62,6 @@ export default function FavoritesScreen({ navigation }: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         },
     });
-
-    const filteredFavorites = useMemo(() => {
-        if (!favorites) return [];
-        return favorites.filter(f => {
-            if (!f.event) return false;
-            if (selectedCategory === "All") return true;
-            return f.event.category === selectedCategory;
-        });
-    }, [favorites, selectedCategory]);
 
     const renderHeader = () => (
         <View style={styles.header}>
@@ -140,6 +131,32 @@ export default function FavoritesScreen({ navigation }: any) {
             </View>
         );
     }
+
+    if (error) {
+        return (
+            <View style={styles.emptyState}>
+                <Ionicons name="alert-circle-outline" size={80} color="#EF4444" />
+                <ThemedText style={styles.emptyTitle}>Error Loading Favorites</ThemedText>
+                <ThemedText style={styles.emptySub}>{(error as Error).message || "Could not fetch your favorites."}</ThemedText>
+                <Pressable
+                    style={[styles.confirmBtn, { marginTop: 20, width: 200 }]}
+                    onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/favorites"] })}
+                >
+                    <ThemedText style={styles.confirmBtnText}>Try Again</ThemedText>
+                </Pressable>
+            </View>
+        );
+    }
+
+    const filteredFavorites = useMemo(() => {
+        if (!favorites || !Array.isArray(favorites)) return [];
+        return favorites.filter(f => {
+            if (!f.event) return false;
+            if (selectedCategory === "All") return true;
+            return f.event.category === selectedCategory;
+        });
+    }, [favorites, selectedCategory]);
+
 
     return (
         <ThemedView style={styles.container}>
