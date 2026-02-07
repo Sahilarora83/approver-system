@@ -170,10 +170,7 @@ export default function FavoritesScreen({ navigation }: any) {
                 renderItem={({ item, index }) => {
                     if (!item.event) return null;
                     return (
-                        <Animated.View
-                            entering={FadeInDown.delay(index * 50)}
-                            style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}
-                        >
+                        <View style={viewMode === "grid" ? styles.gridItemWrapper : styles.listItemWrapper}>
                             <Pressable
                                 style={viewMode === "grid" ? styles.gridCard : styles.listCard}
                                 onPress={() => navigation.navigate("ParticipantEventDetail", { eventId: item.eventId })}
@@ -209,7 +206,7 @@ export default function FavoritesScreen({ navigation }: any) {
                                     <Ionicons name="heart" size={20} color="#7C3AED" />
                                 </Pressable>
                             </Pressable>
-                        </Animated.View>
+                        </View>
                     );
                 }}
                 ListEmptyComponent={

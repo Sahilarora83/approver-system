@@ -167,7 +167,7 @@ export default function MyTicketsScreen({ navigation }: any) {
         renderItem={({ item, index }) => {
           if (!item.event) return null;
           return (
-            <Animated.View entering={FadeInDown.delay(index * 100)} style={styles.ticketWrapper}>
+            <View style={styles.ticketWrapper}>
               <View style={styles.ticketCard}>
                 <View style={styles.ticketMain}>
                   <Image source={{ uri: resolveImageUrl(item.event.coverImage) }} style={styles.eventThumb} />
@@ -233,7 +233,7 @@ export default function MyTicketsScreen({ navigation }: any) {
                   )}
                 </View>
               </View>
-            </Animated.View>
+            </View>
           );
         }}
         ListEmptyComponent={
