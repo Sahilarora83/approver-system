@@ -143,12 +143,30 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
             const method = followStatus?.following ? "DELETE" : "POST";
             await apiRequest(method, `/api/user/follow/${event.organizerId}`);
         },
+        onMutate: async () => {
+            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+            await queryClient.cancelQueries({ queryKey: [`/api/user/follow/${event?.organizerId}/status`] });
+            const previousStatus = queryClient.getQueryData([`/api/user/follow/${event?.organizerId}/status`]);
+
+            // Optimistically update to the new value
+            queryClient.setQueryData([`/api/user/follow/${event?.organizerId}/status`], {
+                following: !followStatus?.following
+            });
+
+            return { previousStatus };
+        },
         onSuccess: () => {
-            refetchFollow();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         },
-        onError: (err) => {
+        onError: (err, _, context) => {
+            // Rollback on error
+            if (context?.previousStatus) {
+                queryClient.setQueryData([`/api/user/follow/${event?.organizerId}/status`], context.previousStatus);
+            }
             console.error("Follow error:", err);
+        },
+        onSettled: () => {
+            refetchFollow();
         },
     });
 
@@ -168,14 +186,27 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
             const method = favoriteStatus?.isFavorited ? "DELETE" : "POST";
             await apiRequest(method, `/api/favorites/${eventId}`);
         },
-        onSuccess: () => {
-            refetchFavorite();
-            queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: [`/api/favorites/${eventId}`] });
+            const previousStatus = queryClient.getQueryData([`/api/favorites/${eventId}`]);
+            queryClient.setQueryData([`/api/favorites/${eventId}`], {
+                isFavorited: !favoriteStatus?.isFavorited
+            });
+            return { previousStatus };
         },
-        onError: (err) => {
+        onSuccess: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+        },
+        onError: (err, _, context) => {
+            if (context?.previousStatus) {
+                queryClient.setQueryData([`/api/favorites/${eventId}`], context.previousStatus);
+            }
             console.error("Favorite error:", err);
         },
+        onSettled: () => {
+            refetchFavorite();
+        }
     });
 
     // Similar Events

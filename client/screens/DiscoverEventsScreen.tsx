@@ -154,9 +154,7 @@ export default function DiscoverEventsScreen({ navigation }: any) {
             if (selectedCategory !== "All") {
                 const categorySearch = selectedCategory.toLowerCase();
                 const matchesCategory =
-                    (event.category && event.category.toLowerCase().includes(categorySearch)) ||
-                    (event.description && event.description.toLowerCase().includes(categorySearch)) ||
-                    event.title.toLowerCase().includes(categorySearch);
+                    (event.category && event.category.toLowerCase() === categorySearch);
                 return matchesSearch && matchesCategory;
             }
             return matchesSearch;
@@ -206,9 +204,9 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                         </View>
                     </View>
                     {event.location && (
-                        <View style={[styles.featuredInfoItem, { marginTop: 8 }]}>
-                            <Feather name="map-pin" size={14} color="#A78BFA" />
-                            <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
+                        <View style={[styles.featuredInfoItem, { marginTop: 12, alignItems: 'flex-start' }]}>
+                            <Feather name="map-pin" size={14} color="#A78BFA" style={{ marginTop: 2 }} />
+                            <ThemedText style={styles.featuredMetaText}>
                                 {event.location}
                             </ThemedText>
                         </View>
