@@ -1,29 +1,31 @@
-import React, { useState } from "react";
-import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Share, FlatList } from "react-native";
+import React, { useState, useRef } from "react";
+import { StyleSheet, View, ScrollView, Pressable, Linking, Dimensions, Platform, ActivityIndicator, Share, FlatList, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns";
 import * as Haptics from "expo-haptics";
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, interpolate, withSpring } from "react-native-reanimated";
 
 import { apiRequest, resolveImageUrl, queryClient } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shadows } from "@/constants/theme";
+import { Shadows, Spacing, BorderRadius } from "@/constants/theme";
 
-const { width } = Dimensions.get("window");
-const ITEM_WIDTH = width;
-const ITEM_HEIGHT = width * 0.85;
+const { width, height } = Dimensions.get("window");
+const IMAGE_HEIGHT = height * 0.55;
 
 const COLORS = {
-    background: "#111827",
+    background: "#0F172A",
+    card: "#1E293B",
     primary: "#6366F1",
-    accent: "#10B981",
-    card: "#1F2937",
-    textSecondary: "#9CA3AF",
+    secondary: "#818CF8",
+    accent: "#7C3AED",
+    textMuted: "#94A3B8",
+    white: "#FFFFFF",
     purpleBtn: "#5856D6"
 };
 
@@ -43,6 +45,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
 
     // Fetch Event Details
     const { data: event, isLoading } = useQuery({
@@ -54,7 +57,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         enabled: !!eventId,
     });
 
-    // Fetch Attendees/Registration Stats
+    // Fetch Attendance
     const { data: attendanceData } = useQuery({
         queryKey: [`/api/events/${eventId}/registrations/count`],
         queryFn: async () => {
@@ -68,7 +71,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         enabled: !!eventId,
     });
 
-    // Check User's Registration Status
+    // Registration Status
     const registrationStatusQuery = useQuery({
         queryKey: ["registration-status", eventId, user?.id],
         queryFn: async () => {
@@ -83,7 +86,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const registrationStatus = registration?.status ? String(registration.status).toLowerCase() : "none";
     const isRegLoading = registrationStatusQuery.isLoading;
 
-    // Follow Logic
+    // Follow Organizer
     const { data: followStatus, refetch: refetchFollow } = useQuery({
         queryKey: [`/api/user/follow/${event?.organizerId}/status`],
         queryFn: async () => {
@@ -105,7 +108,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
         }
     });
 
-    // Favorite Logic
+    // Favorites
     const { data: favoriteStatus, refetch: refetchFavorite } = useQuery({
         queryKey: [`/api/favorites/${eventId}`],
         queryFn: async () => {
@@ -130,7 +133,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
     // Similar Events
     const { data: similarEvents } = useQuery({
-        queryKey: [`/api/events/search`, { category: event?.category, limit: 5 }],
+        queryKey: [`/api/events/similar`, event?.category, eventId],
         queryFn: async () => {
             if (!event?.category) return [];
             const res = await apiRequest("GET", `/api/events/search?category=${encodeURIComponent(event.category)}&limit=5`);
@@ -142,266 +145,284 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
     const handleShare = async () => {
         if (!event) return;
-        const link = event.publicLink || event.public_link;
-        const evtLink = link || event.id;
-        const msg = `Check out ${event.title}\nhttps://qr-ticket-manager.expo.app/events/${evtLink}`;
+        const msg = `Check out ${event.title}\nhttps://qrticket.app/events/${event.publicLink || event.id}`;
         await Share.share({ message: msg });
     };
 
-    const handleRegister = () => {
-        if (!event) return;
-        const isApproved = ["approved", "checked_in", "checked_out"].includes(registrationStatus);
-        const isPending = registrationStatus === "pending";
-        const isRejected = registrationStatus === "rejected";
-
-        if (isApproved) {
+    const handleAction = () => {
+        if (["approved", "checked_in", "checked_out"].includes(registrationStatus)) {
             navigation.navigate("Tickets");
+        } else if (registrationStatus === "pending") {
             return;
+        } else {
+            navigation.navigate("RegisterEvent", { eventLink: event.publicLink || event.id });
         }
-        if (isPending || isRejected) return;
+    };
 
-        navigation.navigate("RegisterEvent", { eventLink: event.publicLink || event.public_link || event.id });
+    const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const slideSize = event.nativeEvent.layoutMeasurement.width;
+        const index = event.nativeEvent.contentOffset.x / slideSize;
+        setActiveImageIndex(Math.round(index));
     };
 
     if (isLoading) {
         return (
-            <ThemedView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ThemedView style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
             </ThemedView>
         );
     }
 
-    if (!event) {
-        return (
-            <ThemedView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-                <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                <ThemedText style={{ marginTop: 12, fontSize: 18, fontWeight: "700" }}>Event not found</ThemedText>
-                <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 20, padding: 12, backgroundColor: COLORS.primary, borderRadius: 8 }}>
-                    <ThemedText style={{ color: "#FFF" }}>Go Back</ThemedText>
-                </Pressable>
-            </ThemedView>
-        );
-    }
+    if (!event) return null;
 
-    const isApproved = ["approved", "checked_in", "checked_out"].includes(registrationStatus);
-    const isPending = registrationStatus === "pending";
-    const isRejected = registrationStatus === "rejected";
     const gallery = event.gallery && Array.isArray(event.gallery) && event.gallery.length > 0 ? event.gallery : [event.coverImage];
+    const isParticipant = true; // Always participant in this screen
 
     return (
         <ThemedView style={styles.container}>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                {/* Header Image Area */}
-                <View style={{ width: ITEM_WIDTH, height: ITEM_HEIGHT, position: 'relative' }}>
-                    <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={{ paddingBottom: 120 }}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+            >
+                {/* Hero Carousel */}
+                <View style={styles.heroContainer}>
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onScroll={onScroll}
+                        scrollEventThrottle={16}
+                    >
                         {gallery.map((img: string, i: number) => (
                             <Image
                                 key={i}
                                 source={{ uri: resolveImageUrl(img) }}
-                                style={{ width: ITEM_WIDTH, height: ITEM_HEIGHT }}
+                                style={styles.heroImage}
                                 contentFit="cover"
                             />
                         ))}
                     </ScrollView>
 
-                    {/* Header Controls */}
-                    <View style={[styles.headerControls, { top: insets.top + 10 }]}>
-                        <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                            <Ionicons name="arrow-back" size={24} color="#FFF" />
+                    {/* Pagination Dots */}
+                    <View style={styles.pagination}>
+                        {(gallery as string[]).map((_: string, i: number) => (
+                            <View
+                                key={i}
+                                style={[
+                                    styles.dot,
+                                    activeImageIndex === i && styles.activeDot,
+                                    activeImageIndex === i && { width: 24 }
+                                ]}
+                            />
+                        ))}
+                    </View>
+
+                    {/* Header Overlay */}
+                    <View style={[styles.headerOverlay, { top: insets.top + 10 }]}>
+                        <Pressable onPress={() => navigation.goBack()} style={styles.circularBtn}>
+                            <Ionicons name="arrow-back" size={22} color="#FFF" />
                         </Pressable>
-                        <View style={{ flexDirection: "row", gap: 12 }}>
-                            <Pressable onPress={() => favoriteMutation.mutate()} style={styles.iconBtn}>
-                                <Ionicons name={favoriteStatus?.isFavorited ? "heart" : "heart-outline"} size={22} color={favoriteStatus?.isFavorited ? "#EF4444" : "#FFF"} />
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <Pressable
+                                onPress={() => favoriteMutation.mutate()}
+                                style={styles.circularBtn}
+                            >
+                                <Ionicons
+                                    name={favoriteStatus?.isFavorited ? "heart" : "heart-outline"}
+                                    size={22}
+                                    color={favoriteStatus?.isFavorited ? "#EF4444" : "#FFF"}
+                                />
                             </Pressable>
-                            <Pressable onPress={handleShare} style={styles.iconBtn}>
-                                <Ionicons name="share-outline" size={22} color="#FFF" />
+                            <Pressable onPress={handleShare} style={styles.circularBtn}>
+                                <Ionicons name="share-social-outline" size={22} color="#FFF" />
                             </Pressable>
                         </View>
                     </View>
 
                     <LinearGradient
-                        colors={["transparent", "rgba(17, 24, 39, 0.6)", "#111827"]}
-                        style={{ position: 'absolute', bottom: 0, width: '100%', height: 140 }}
+                        colors={["transparent", "rgba(15, 23, 42, 0.4)", "rgba(15, 23, 42, 1)"]}
+                        style={styles.heroGradient}
                     />
                 </View>
 
-                <View style={styles.contentContainer}>
-                    <ThemedText style={styles.title}>{event.title}</ThemedText>
+                {/* Main Content */}
+                <Animated.View entering={FadeInDown.duration(800)} style={styles.content}>
+                    <View style={styles.titleSection}>
+                        <ThemedText style={styles.mainTitle}>{event.title}</ThemedText>
 
-                    {/* Category & Attendees */}
-                    <View style={styles.badgeRow}>
-                        <View style={styles.categoryBadge}>
-                            <ThemedText style={styles.categoryText}>{event.category || "General"}</ThemedText>
-                        </View>
-                        {attendanceData && attendanceData.count > 0 && (
-                            <Pressable style={styles.attendeesRow} onPress={() => navigation.navigate("Attendees", { eventId: event.id })}>
-                                <View style={styles.avatarsPile}>
-                                    {(attendanceData.registrations || []).slice(0, 3).map((r: any, i: number) => (
+                        <View style={styles.metaBadgeRow}>
+                            <View style={styles.typeBadge}>
+                                <ThemedText style={styles.typeBadgeText}>{event.category || "General"}</ThemedText>
+                            </View>
+
+                            <Pressable style={styles.goingContainer} onPress={() => navigation.navigate("Attendees", { eventId: event.id })}>
+                                <View style={styles.avatarsWrapper}>
+                                    {(attendanceData?.registrations || []).slice(0, 4).map((r: any, i: number) => (
                                         <Image
                                             key={i}
                                             source={{ uri: r.profileImage ? resolveImageUrl(r.profileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}` }}
-                                            style={[styles.pileAvatar, { marginLeft: i === 0 ? 0 : -10 }]}
+                                            style={[styles.miniAvatar, { left: i * 20 }]}
                                         />
                                     ))}
                                 </View>
-                                <ThemedText style={styles.attendeeCountText}>
-                                    {attendanceData.count > 1000 ? `${(attendanceData.count / 1000).toFixed(1)}k+` : `${attendanceData.count}+`} going
+                                <ThemedText style={styles.goingText}>
+                                    {attendanceData?.count ? `${attendanceData.count.toLocaleString()}+ going` : "Be the first to join"}
                                 </ThemedText>
-                                <Ionicons name="arrow-forward" size={14} color={COLORS.textSecondary} style={{ marginLeft: 4 }} />
-                            </Pressable>
-                        )}
-                    </View>
-
-                    <View style={styles.divider} />
-
-                    {/* Date Section */}
-                    <View style={styles.infoRow}>
-                        <View style={styles.iconBox}>
-                            <Ionicons name="calendar" size={20} color={COLORS.primary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <ThemedText style={styles.infoTitle}>{safeFormat(event.startDate, "EEEE, MMMM d, yyyy")}</ThemedText>
-                            <ThemedText style={styles.infoSub}>{safeFormat(event.startDate, "h:mm a")} - {event.endDate ? safeFormat(event.endDate, "h:mm a") : "Late"}</ThemedText>
-
-                            <Pressable style={styles.smallActionBtn}>
-                                <Ionicons name="calendar-outline" size={12} color="#FFF" />
-                                <ThemedText style={styles.smallActionBtnText}>Add to My Calendar</ThemedText>
+                                <Ionicons name="chevron-forward" size={14} color={COLORS.textMuted} />
                             </Pressable>
                         </View>
                     </View>
 
-                    {/* Location Section */}
-                    <View style={styles.infoRow}>
-                        <View style={styles.iconBox}>
-                            <Ionicons name="location" size={20} color={COLORS.primary} />
+                    {/* Info Rows */}
+                    <View style={styles.infoGrid}>
+                        {/* Date Time */}
+                        <View style={styles.infoCard}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="calendar" size={24} color={COLORS.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.labelTitle}>{safeFormat(event.startDate, "EEEE, MMMM d, yyyy")}</ThemedText>
+                                <ThemedText style={styles.labelSubtitle}>
+                                    {safeFormat(event.startDate, "h:mm a")} - {event.endDate ? safeFormat(event.endDate, "h:mm a") : "Late"}
+                                </ThemedText>
+                                <Pressable style={styles.actionPill}>
+                                    <Ionicons name="calendar-outline" size={12} color="#FFF" />
+                                    <ThemedText style={styles.actionPillText}>Add to My Calendar</ThemedText>
+                                </Pressable>
+                            </View>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <ThemedText style={styles.infoTitle}>{event.location || "Online Event"}</ThemedText>
-                            <ThemedText style={styles.infoSub} numberOfLines={2}>{event.address || "No address provided"}</ThemedText>
 
-                            <Pressable
-                                style={styles.smallActionBtn}
-                                onPress={() => {
-                                    const q = encodeURIComponent(event.address || event.location || "");
-                                    if (q) Linking.openURL(Platform.OS === 'ios' ? `maps://app?q=${q}` : `geo:0,0?q=${q}`);
-                                }}
-                            >
-                                <Ionicons name="map-outline" size={12} color="#FFF" />
-                                <ThemedText style={styles.smallActionBtnText}>See Location on Maps</ThemedText>
-                            </Pressable>
+                        {/* Location */}
+                        <View style={styles.infoCard}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="location" size={24} color={COLORS.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.labelTitle}>{event.location || "Venue TBD"}</ThemedText>
+                                <ThemedText style={styles.labelSubtitle} numberOfLines={1}>{event.address || "Check details below"}</ThemedText>
+                                <Pressable
+                                    style={styles.actionPill}
+                                    onPress={() => {
+                                        const loc = event.address || event.location;
+                                        if (loc) Linking.openURL(Platform.OS === 'ios' ? `maps://app?q=${loc}` : `geo:0,0?q=${loc}`);
+                                    }}
+                                >
+                                    <Ionicons name="map-outline" size={12} color="#FFF" />
+                                    <ThemedText style={styles.actionPillText}>See Location on Maps</ThemedText>
+                                </Pressable>
+                            </View>
                         </View>
                     </View>
-
-                    {/* Price Section */}
-                    <View style={styles.infoRow}>
-                        <View style={styles.iconBox}>
-                            <Ionicons name="ticket" size={20} color={COLORS.primary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <ThemedText style={styles.infoTitle}>
-                                {event.price && Number(event.price) > 0 ? `$${event.price}` : "Free"}
-                            </ThemedText>
-                            <ThemedText style={styles.infoSub}>Ticket price per person</ThemedText>
-                        </View>
-                    </View>
-
-                    <View style={styles.divider} />
 
                     {/* Organizer Section */}
-                    <Pressable style={styles.organizerRow}>
-                        <Image
-                            source={{ uri: event.organizerProfileImage ? resolveImageUrl(event.organizerProfileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizerId}` }}
-                            style={styles.organizerAvatar}
-                        />
-                        <View style={{ flex: 1 }}>
-                            <ThemedText style={styles.organizerName}>{event.organizerName || "Organizer"}</ThemedText>
-                            <ThemedText style={styles.organizerRole}>Organizer</ThemedText>
+                    <View style={styles.organizerSection}>
+                        <View style={styles.organizerInner}>
+                            <Image
+                                source={{ uri: event.organizerProfileImage ? resolveImageUrl(event.organizerProfileImage) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizerId}` }}
+                                style={styles.organizerPic}
+                            />
+                            <View style={{ flex: 1 }}>
+                                <ThemedText style={styles.organizerName}>{event.organizerName || "Organizer"}</ThemedText>
+                                <ThemedText style={styles.organizerLabel}>Organizer</ThemedText>
+                            </View>
+                            <Pressable
+                                style={[styles.followButton, followStatus?.following && styles.followed]}
+                                onPress={() => followMutation.mutate()}
+                            >
+                                <ThemedText style={styles.followText}>{followStatus?.following ? "Following" : "Follow"}</ThemedText>
+                            </Pressable>
                         </View>
-                        <Pressable
-                            style={[styles.followBtn, followStatus?.following && styles.followBtnActive]}
-                            onPress={() => followMutation.mutate()}
-                        >
-                            <ThemedText style={styles.followBtnText}>
-                                {followStatus?.following ? "Following" : "Follow"}
-                            </ThemedText>
-                        </Pressable>
-                    </Pressable>
-
-                    {/* About Section */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionHeader}>About Event</ThemedText>
-                        <Pressable onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                            <ThemedText style={styles.aboutText} numberOfLines={isDescriptionExpanded ? undefined : 6}>
-                                {event.description || "No description provided."}
-                            </ThemedText>
-                            <ThemedText style={styles.readMore}>{isDescriptionExpanded ? "Read Less" : "Read More..."}</ThemedText>
-                        </Pressable>
                     </View>
 
-                    {/* Gallery Section */}
-                    {gallery.length > 0 && (
-                        <View style={styles.section}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <ThemedText style={styles.sectionHeader}>Gallery</ThemedText>
-                                {/* <ThemedText style={{color: COLORS.primary, fontSize: 13, fontWeight: "600"}}>See All</ThemedText> */}
-                            </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                                {gallery.map((img: string, i: number) => (
-                                    <Image
-                                        key={i}
-                                        source={{ uri: resolveImageUrl(img) }}
-                                        style={{ width: 100, height: 100, borderRadius: 16 }}
-                                    />
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                    {/* About */}
+                    <View style={styles.sectionHeaderRow}>
+                        <ThemedText style={styles.sectionTitle}>About Event</ThemedText>
+                    </View>
+                    <Pressable onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                        <ThemedText style={styles.description} numberOfLines={isDescriptionExpanded ? undefined : 4}>
+                            {event.description || "No detailed description available for this event yet."}
+                        </ThemedText>
+                        <ThemedText style={styles.readMoreText}>{isDescriptionExpanded ? "Show Less" : "Read more..."}</ThemedText>
+                    </Pressable>
 
-                    {/* Similar Events */}
-                    {similarEvents && similarEvents.length > 0 && (
-                        <View style={styles.section}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <ThemedText style={styles.sectionHeader}>More Events like this</ThemedText>
-                                {/* <ThemedText style={{color: COLORS.primary, fontSize: 13, fontWeight: "600"}}>See All</ThemedText> */}
+                    {/* Gallery Preview */}
+                    <View style={styles.sectionHeaderRow}>
+                        <ThemedText style={styles.sectionTitle}>Gallery (Pre-Event)</ThemedText>
+                        <Pressable><ThemedText style={styles.seeAll}>See All</ThemedText></Pressable>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryScroll}>
+                        {(gallery as string[]).map((img: string, i: number) => (
+                            <Image key={i} source={{ uri: resolveImageUrl(img) }} style={styles.galleryImg} />
+                        ))}
+                        {gallery.length > 2 && (
+                            <View style={styles.galleryImgOverlay}>
+                                <ThemedText style={styles.overlayText}>20+</ThemedText>
                             </View>
-                            <FlatList
-                                horizontal
-                                data={similarEvents}
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ gap: 14 }}
-                                renderItem={({ item }) => (
+                        )}
+                    </ScrollView>
+
+                    {/* Location Placeholder */}
+                    <View style={styles.sectionHeaderRow}>
+                        <ThemedText style={styles.sectionTitle}>Location</ThemedText>
+                    </View>
+                    <View style={styles.locationSnippet}>
+                        <Ionicons name="location" size={16} color={COLORS.primary} />
+                        <ThemedText style={styles.snippetText}>{event.address || event.location || "San Francisco, CA"}</ThemedText>
+                    </View>
+                    <View style={styles.mapMock}>
+                        <Image
+                            source={{ uri: "https://api.mapbox.com/styles/v1/mapbox/dark-v10/static/-122.4194,37.7749,12/600x300?access_token=pk.eyJ1IjoiYmFycnljb2xsaW5zIiwiYSI6ImNrdHByNjFwajBoeWIyd3BndWd6NjR3bmIifQ.X9_3S4Z4-x4P5J8I_q6w5g" }}
+                            style={styles.mapImage}
+                        />
+                        <View style={styles.mapPin}>
+                            <View style={styles.pinCircle}>
+                                <Ionicons name="musical-notes" size={14} color="#FFF" />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* More Events */}
+                    {similarEvents && similarEvents.length > 0 && (
+                        <>
+                            <View style={styles.sectionHeaderRow}>
+                                <ThemedText style={styles.sectionTitle}>More Events like this</ThemedText>
+                                <Pressable><ThemedText style={styles.seeAll}>See All</ThemedText></Pressable>
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarScroll}>
+                                {(similarEvents as any[]).map((item: any) => (
                                     <Pressable
+                                        key={item.id}
                                         style={styles.similarCard}
                                         onPress={() => navigation.push("ParticipantEventDetail", { eventId: item.id })}
                                     >
-                                        <Image source={{ uri: resolveImageUrl(item.coverImage) }} style={styles.similarImg} />
-                                        <ThemedText numberOfLines={1} style={styles.similarTitle}>{item.title}</ThemedText>
+                                        <Image source={{ uri: resolveImageUrl(item.coverImage) }} style={styles.similarImage} />
+                                        <LinearGradient colors={["transparent", "rgba(0,0,0,0.8)"]} style={StyleSheet.absoluteFill} />
+                                        <ThemedText style={styles.similarTitle} numberOfLines={1}>{item.title}</ThemedText>
                                     </Pressable>
-                                )}
-                            />
-                        </View>
+                                ))}
+                            </ScrollView>
+                        </>
                     )}
-
-                </View>
+                </Animated.View>
             </ScrollView>
 
-            {/* Bottom Floating Button */}
-            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom + 10, 20) }]}>
+            {/* Sticky Bottom Action */}
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                 <Pressable
-                    style={[
-                        styles.bookBtn,
-                        isApproved && { backgroundColor: COLORS.accent },
-                        isRejected && { backgroundColor: "#EF4444" },
-                        (isRegLoading || isPending) && { opacity: 0.7 }
+                    style={({ pressed }) => [
+                        styles.primaryBtn,
+                        { opacity: pressed || registrationStatus === "pending" ? 0.8 : 1 },
+                        registrationStatus === "approved" && { backgroundColor: "#10B981" }
                     ]}
-                    onPress={handleRegister}
-                    disabled={isRegLoading || isPending}
+                    onPress={handleAction}
+                    disabled={registrationStatus === "pending"}
                 >
                     {isRegLoading ? (
-                        <ActivityIndicator size="small" color="#FFF" />
+                        <ActivityIndicator color="#FFF" />
                     ) : (
-                        <ThemedText style={styles.bookBtnText}>
-                            {isApproved ? "Show Ticket" : isPending ? "Pending Approval" : isRejected ? "Registration Rejected" : "Book Event"}
+                        <ThemedText style={styles.btnText}>
+                            {registrationStatus === "approved" ? "Show Ticket" : registrationStatus === "pending" ? "Request Pending" : "Book Event"}
                         </ThemedText>
                     )}
                 </Pressable>
@@ -412,95 +433,113 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    headerControls: {
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+    heroContainer: { width: "100%", height: IMAGE_HEIGHT, position: 'relative' },
+    heroImage: { width: width, height: IMAGE_HEIGHT },
+    heroGradient: { position: 'absolute', bottom: 0, width: '100%', height: '70%' },
+    headerOverlay: {
         position: 'absolute', left: 0, right: 0,
         flexDirection: 'row', justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        zIndex: 10
+        paddingHorizontal: 20, zIndex: 100
     },
-    iconBtn: {
+    circularBtn: {
         width: 44, height: 44, borderRadius: 22,
-        backgroundColor: "rgba(0,0,0,0.3)",
+        backgroundColor: "rgba(30, 41, 59, 0.4)",
         justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+        borderWidth: 1, borderColor: "rgba(255,255,255,0.1)"
     },
-    contentContainer: {
-        marginTop: -30,
-        paddingHorizontal: 24,
+    pagination: {
+        position: 'absolute', bottom: 60, width: '100%',
+        flexDirection: 'row', justifyContent: 'center', gap: 6
     },
-    title: { fontSize: 32, fontWeight: "700", color: "#FFF", marginBottom: 16, lineHeight: 40 },
-    badgeRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" },
-    categoryBadge: {
-        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
-        backgroundColor: "rgba(99, 102, 241, 0.15)", borderWidth: 1, borderColor: "rgba(99, 102, 241, 0.3)"
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.3)" },
+    activeDot: { backgroundColor: "#FFF" },
+
+    content: { marginTop: -40, paddingHorizontal: 24 },
+    titleSection: { marginBottom: 24 },
+    mainTitle: { fontSize: 32, fontWeight: "900", color: "#FFF", lineHeight: 42, marginBottom: 12 },
+    metaBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    typeBadge: {
+        paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6,
+        borderWidth: 1, borderColor: "rgba(99, 102, 241, 0.4)",
+        backgroundColor: "rgba(99, 102, 241, 0.1)"
     },
-    categoryText: { fontSize: 13, fontWeight: "600", color: COLORS.primary },
+    typeBadgeText: { color: COLORS.primary, fontSize: 10, fontWeight: "800", textTransform: 'uppercase' },
+    goingContainer: { flexDirection: 'row', alignItems: 'center' },
+    avatarsWrapper: { width: 80, height: 32, position: 'relative' },
+    miniAvatar: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: COLORS.background, position: 'absolute' },
+    goingText: { color: "#FFF", fontSize: 13, fontWeight: "600", marginRight: 4, marginLeft: 10 },
 
-    attendeesRow: { flexDirection: "row", alignItems: "center" },
-    avatarsPile: { flexDirection: "row" },
-    pileAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: COLORS.background },
-    attendeeCountText: { marginLeft: 12, fontSize: 14, fontWeight: "500", color: "#FFF" }, // Changing to White/Grey for modern look
-
-    divider: { height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginBottom: 24 },
-
-    infoRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
-    iconBox: {
+    infoGrid: { gap: 16, marginBottom: 32 },
+    infoCard: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+    iconContainer: {
         width: 52, height: 52, borderRadius: 16,
-        backgroundColor: "rgba(255,255,255,0.05)",
-        justifyContent: "center", alignItems: "center"
+        backgroundColor: "rgba(255,255,255,0.04)",
+        justifyContent: 'center', alignItems: 'center'
     },
-    infoTitle: { fontSize: 16, fontWeight: "700", color: "#FFF", marginBottom: 4 },
-    infoSub: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20, marginBottom: 8 },
-    smallActionBtn: {
+    labelTitle: { fontSize: 16, fontWeight: "800", color: "#FFF", marginBottom: 2 },
+    labelSubtitle: { fontSize: 13, color: COLORS.textMuted, fontWeight: "500", marginBottom: 8 },
+    actionPill: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        paddingHorizontal: 12, paddingVertical: 6,
-        backgroundColor: "rgba(99, 102, 241, 0.2)",
+        backgroundColor: "rgba(124, 92, 214, 0.6)", paddingHorizontal: 12, paddingVertical: 6,
         borderRadius: 20, alignSelf: 'flex-start'
     },
-    smallActionBtnText: { color: "#818CF8", fontSize: 12, fontWeight: "600" },
+    actionPillText: { color: "#FFF", fontSize: 11, fontWeight: "700" },
 
-    organizerRow: {
-        flexDirection: "row", alignItems: "center", gap: 14,
-        paddingVertical: 4, marginBottom: 30
+    organizerSection: { marginBottom: 32, paddingVertical: 12 },
+    organizerInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    organizerPic: { width: 44, height: 44, borderRadius: 12 },
+    organizerName: { fontSize: 15, fontWeight: "800", color: "#FFF" },
+    organizerLabel: { fontSize: 12, color: COLORS.textMuted, fontWeight: "500" },
+    followButton: {
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12,
+        backgroundColor: COLORS.accent
     },
-    organizerAvatar: { width: 48, height: 48, borderRadius: 24 },
-    organizerName: { fontSize: 16, fontWeight: "700", color: "#FFF" },
-    organizerRole: { fontSize: 13, color: COLORS.textSecondary },
-    followBtn: {
-        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-        backgroundColor: "rgba(255,255,255,0.1)",
-    },
-    followBtnActive: { backgroundColor: COLORS.primary },
-    followBtnText: { fontSize: 13, fontWeight: "600", color: "#FFF" },
+    followed: { backgroundColor: "rgba(255,255,255,0.1)" },
+    followText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
 
-    section: { marginBottom: 32 },
-    sectionHeader: { fontSize: 18, fontWeight: "700", color: "#FFF", marginBottom: 12 },
-    aboutText: { fontSize: 15, color: "#D1D5DB", lineHeight: 26 },
-    readMore: { color: COLORS.primary, fontWeight: "600", marginTop: 8 },
-
-    similarCard: { width: 260, height: 160, borderRadius: 16, overflow: 'hidden' },
-    similarImg: { width: "100%", height: "100%", position: 'absolute' },
-    similarTitle: {
-        position: 'absolute', bottom: 12, left: 12, right: 12,
-        color: "#FFF", fontWeight: "700", fontSize: 16,
-        textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4
+    sectionHeaderRow: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', marginBottom: 12, marginTop: 8
     },
+    sectionTitle: { fontSize: 18, fontWeight: "900", color: "#FFF" },
+    seeAll: { color: COLORS.secondary, fontSize: 13, fontWeight: "700" },
+    description: { fontSize: 15, color: "#94A3B8", lineHeight: 24, fontWeight: "500" },
+    readMoreText: { color: COLORS.secondary, marginTop: 6, fontWeight: "700" },
+
+    galleryScroll: { gap: 12, marginTop: 4 },
+    galleryImg: { width: 110, height: 110, borderRadius: 20 },
+    galleryImgOverlay: {
+        position: 'absolute', right: 0, width: 110, height: 110,
+        backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20,
+        justifyContent: 'center', alignItems: 'center', zIndex: 5
+    },
+    overlayText: { color: '#FFF', fontSize: 20, fontWeight: "800" },
+
+    locationSnippet: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    snippetText: { fontSize: 14, color: "#CBD5E1", fontWeight: "600" },
+    mapMock: { width: '100%', height: 180, borderRadius: 24, overflow: 'hidden', position: 'relative' },
+    mapImage: { width: '100%', height: '100%' },
+    mapPin: { position: 'absolute', top: '40%', left: '50%', zIndex: 10 },
+    pinCircle: {
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: COLORS.accent, borderWidth: 3, borderColor: "rgba(124, 92, 214, 0.4)",
+        justifyContent: 'center', alignItems: 'center'
+    },
+
+    similarScroll: { gap: 14 },
+    similarCard: { width: 260, height: 160, borderRadius: 24, overflow: 'hidden' },
+    similarImage: { width: '100%', height: '100%' },
+    similarTitle: { position: 'absolute', bottom: 16, left: 16, color: '#FFF', fontWeight: "800", fontSize: 16 },
 
     bottomBar: {
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        backgroundColor: 'transparent',
+        position: 'absolute', bottom: 0, width: '100%',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)', paddingHorizontal: 24,
+        paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)"
     },
-    bookBtn: {
-        backgroundColor: COLORS.purpleBtn,
-        marginHorizontal: 20,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: "center", alignItems: "center",
-        shadowColor: COLORS.purpleBtn,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 8
+    primaryBtn: {
+        backgroundColor: COLORS.purpleBtn, height: 60, borderRadius: 30,
+        justifyContent: 'center', alignItems: 'center', ...Shadows.lg
     },
-    bookBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700", letterSpacing: 0.5 }
+    btnText: { color: '#FFF', fontSize: 18, fontWeight: "800" }
 });
