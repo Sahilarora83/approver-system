@@ -143,8 +143,37 @@ export default function SettingsScreen({ navigation }: any) {
                     </Pressable>
                 </Section>
 
+                <Section title="APP UPDATES" delay={600}>
+                    <Pressable onPress={async () => {
+                        try {
+                            const Updates = await import('expo-updates');
+                            if (__DEV__) {
+                                alert('Updates are not available in development mode.');
+                                return;
+                            }
+                            const { isAvailable } = await Updates.checkForUpdateAsync();
+                            if (isAvailable) {
+                                await Updates.fetchUpdateAsync();
+                                await Updates.reloadAsync();
+                            } else {
+                                alert('No updates available. You are on the latest version.');
+                            }
+                        } catch (error: any) {
+                            alert(`Error checking for updates: ${error.message}`);
+                        }
+                    }}>
+                        <SettingRow
+                            label="Check for Updates"
+                            icon="download-cloud"
+                            type="link"
+                            theme={theme}
+                            isLast
+                        />
+                    </Pressable>
+                </Section>
+
                 <View style={styles.versionContainer}>
-                    <ThemedText style={styles.versionText}>Version 1.0.0 (Global Scale)</ThemedText>
+                    <ThemedText style={styles.versionText}>Version 1.0.1 (Koyeb Prod)</ThemedText>
                 </View>
             </ScrollView>
         </View>
