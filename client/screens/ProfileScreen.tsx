@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, resolveImageUrl } from "@/lib/query-client";
+import { apiRequest, resolveImageUrl, queryClient } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
@@ -68,27 +68,38 @@ export default function ProfileScreen({ navigation }: any) {
   const tabBarHeight = useBottomTabBarHeight();
   const { user, logout, refreshUser } = useAuth();
   const scrollY = useSharedValue(0);
+  const [lastRefreshTime, setLastRefreshTime] = React.useState(0);
 
-  const { data: stats, isLoading: isStatsLoading } = useQuery({
+  /* API Response Validation: Ensure array */
+  const { data: stats, isLoading: isStatsLoading, error } = useQuery<any>({
     queryKey: ["userStats", user?.id],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/stats");
       return res.json();
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 2,
   });
 
   useFocusEffect(
     useCallback(() => {
-      if (user) refreshUser();
-    }, [refreshUser])
+      const now = Date.now();
+      if (user && (!lastRefreshTime || now - lastRefreshTime > 300000)) {
+        refreshUser();
+        setLastRefreshTime(now);
+      }
+    }, [refreshUser, user, lastRefreshTime])
   );
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y;
     },
-  });
+  }, []);
 
   const coverAnimatedStyle = useAnimatedStyle(() => {
     const scale = interpolate(scrollY.value, [-100, 0], [1.2, 1], "clamp");
@@ -102,33 +113,70 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleShare = async () => {
     try {
-      await Share.share({
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(`https://qrticket.app/user/${user?.id}`);
+        // Consider adding a toast here
+        return;
+      }
+
+      const result = await Share.share({
         message: `Check out my profile on QR Ticket Manager!`,
         url: `https://qrticket.app/user/${user?.id}`,
       });
+
+      if (result.action === Share.sharedAction) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Share failed:", error);
     }
   };
 
+  const safeNavigate = useCallback((routeName: string, params?: any) => {
+    try {
+      navigation.navigate(routeName, params);
+    } catch (e) {
+      console.warn(`Navigation failed:`, e);
+    }
+  }, [navigation]);
+
+  if (error) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.errorState}>
+          <Ionicons name="alert-circle" size={60} color="#EF4444" />
+          <ThemedText style={styles.errorText}>Failed to load profile stats</ThemedText>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => queryClient.invalidateQueries({ queryKey: ["userStats"] })}
+          >
+            <ThemedText style={styles.retryText}>Retry</ThemedText>
+          </Pressable>
+        </View>
+      </ThemedView>
+    );
+  }
+
   const accountItems: MenuItem[] = [
-    { icon: "user", lib: "Feather", label: "Edit Profile", description: "Name, bio, and profile image", onPress: () => navigation.navigate("EditProfile") },
+    { icon: "user", lib: "Feather", label: "Edit Profile", description: "Name, bio, and profile image", onPress: () => safeNavigate("EditProfile") },
     {
       icon: "notifications",
       lib: "Ionicons",
       label: "Notifications",
       description: "Manage your alerts and news",
-      onPress: () => navigation.navigate("Notifications"),
-      badge: stats?.unreadNotifications > 0 ? String(stats.unreadNotifications) : undefined
+      onPress: () => safeNavigate("Notifications"),
+      badge: stats?.unreadNotifications > 0
+        ? (stats.unreadNotifications > 99 ? "99+" : String(stats.unreadNotifications))
+        : undefined
     },
-    { icon: "heart", lib: "Feather", label: "Favorites", description: "Events you've saved", onPress: () => navigation.navigate("Favorites") },
-    { icon: "settings", lib: "Feather", label: "Settings", description: "Privacy and app preferences", onPress: () => navigation.navigate("Settings") },
+    { icon: "heart", lib: "Feather", label: "Favorites", description: "Events you've saved", onPress: () => safeNavigate("Favorites") },
+    { icon: "settings", lib: "Feather", label: "Settings", description: "Privacy and app preferences", onPress: () => safeNavigate("Settings") },
   ];
 
   const supportItems: MenuItem[] = [
-    { icon: "help-circle", lib: "Feather", label: "Help Center", onPress: () => navigation.navigate("HelpCenter") },
-    { icon: "shield-checkmark", lib: "Ionicons", label: "Privacy Policy", onPress: () => navigation.navigate("PrivacyPolicy") },
-    { icon: "information-circle", lib: "Ionicons", label: "About QR Ticket", onPress: () => navigation.navigate("AboutApp") },
+    { icon: "help-circle", lib: "Feather", label: "Help Center", onPress: () => safeNavigate("HelpCenter") },
+    { icon: "shield-checkmark", lib: "Ionicons", label: "Privacy Policy", onPress: () => safeNavigate("PrivacyPolicy") },
+    { icon: "information-circle", lib: "Ionicons", label: "About QR Ticket", onPress: () => safeNavigate("AboutApp") },
   ];
 
   return (
@@ -143,8 +191,13 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.coverWrapper}>
           <Animated.View style={[styles.coverContainer, coverAnimatedStyle]}>
             <Image
-              source={{ uri: user?.profileImage ? resolveImageUrl(user.profileImage) : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070&auto=format&fit=crop" }}
+              source={{
+                uri: user?.profileImage
+                  ? `${resolveImageUrl(user.profileImage)}?w=800&q=75`
+                  : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070&auto=format&fit=crop"
+              }}
               style={styles.coverImage}
+              resizeMode="cover"
             />
             <LinearGradient
               colors={["rgba(17, 24, 39, 0.4)", "rgba(17, 24, 39, 0.95)"]}
@@ -160,7 +213,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Image
                 source={{
                   uri: user?.profileImage
-                    ? resolveImageUrl(user.profileImage)
+                    ? `${resolveImageUrl(user.profileImage)}?w=400&q=75`
                     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || 'guest'}`
                 }}
                 style={styles.avatar}
@@ -372,4 +425,8 @@ const styles = StyleSheet.create({
   },
   logoutText: { fontSize: 16, fontWeight: "800", color: "#EF4444" },
   versionInfo: { textAlign: "center", fontSize: 12, color: "#4B5563", marginTop: 24, fontWeight: "600" },
+  errorState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+  errorText: { fontSize: 18, fontWeight: "700", color: "#FFF", marginTop: 16, marginBottom: 8 },
+  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#7C3AED", borderRadius: 20, marginTop: 12 },
+  retryText: { color: "#FFF", fontWeight: "700" }
 });
