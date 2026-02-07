@@ -152,7 +152,11 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
     const handleAction = () => {
         if (["approved", "checked_in", "checked_out"].includes(registrationStatus)) {
-            navigation.navigate("Tickets");
+            if (registration?.id) {
+                navigation.navigate("TicketView", { registrationId: registration.id });
+            } else {
+                navigation.navigate("Tickets");
+            }
         } else if (registrationStatus === "pending") {
             return;
         } else {
@@ -398,12 +402,16 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
 
                     {/* Similar Events */}
                     {similarEvents && similarEvents.length > 0 && (
-                        <>
-                            <View style={[styles.sectionHeader, { marginTop: 32 }]}>
+                        <View style={{ marginTop: 40, paddingBottom: 40 }}>
+                            <View style={[styles.sectionHeader, { paddingHorizontal: 4 }]}>
                                 <ThemedText style={styles.sectionHeading}>More Events like this</ThemedText>
                                 <Pressable><ThemedText style={styles.seeAllLink}>See All</ThemedText></Pressable>
                             </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarList}>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 16, paddingVertical: 12 }}
+                            >
                                 {(similarEvents as any[]).map((item: any) => (
                                     <Pressable
                                         key={item.id}
@@ -411,20 +419,28 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                         onPress={() => navigation.push("ParticipantEventDetail", { eventId: item.id })}
                                     >
                                         <Image source={{ uri: resolveImageUrl(item.coverImage) }} style={styles.similarEvtImg} />
-                                        <LinearGradient colors={["transparent", "rgba(0,0,0,0.6)", "rgba(0,0,0,0.9)"]} style={StyleSheet.absoluteFill} />
+                                        <LinearGradient
+                                            colors={["transparent", "rgba(0,0,0,0.4)", "rgba(0,0,0,0.9)"]}
+                                            style={StyleSheet.absoluteFill}
+                                        />
                                         <View style={styles.similarEvtContent}>
                                             <ThemedText style={styles.similarEvtTitle} numberOfLines={1}>{item.title}</ThemedText>
                                             <View style={styles.similarEvtFooter}>
-                                                <ThemedText style={styles.similarEvtDate}>{new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</ThemedText>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                    <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.6)" />
+                                                    <ThemedText style={styles.similarEvtDate}>
+                                                        {new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                    </ThemedText>
+                                                </View>
                                                 <View style={styles.similarRegisterBadge}>
-                                                    <ThemedText style={styles.similarRegisterText}>Register</ThemedText>
+                                                    <ThemedText style={styles.similarRegisterText}>Book</ThemedText>
                                                 </View>
                                             </View>
                                         </View>
                                     </Pressable>
                                 ))}
                             </ScrollView>
-                        </>
+                        </View>
                     )}
                 </Animated.View>
             </ScrollView>
@@ -444,7 +460,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         <ActivityIndicator color="#FFF" />
                     ) : (
                         <ThemedText style={styles.bookNowBtnText}>
-                            {registrationStatus === "approved" ? "Show Ticket" : registrationStatus === "pending" ? "Request Pending" : "Register Now"}
+                            {registrationStatus === "approved" ? "Joined • View Ticket" :
+                                registrationStatus === "pending" ? "Pending Approval" :
+                                    "Book Event"}
                         </ThemedText>
                     )}
                 </Pressable>
@@ -565,17 +583,49 @@ const styles = StyleSheet.create({
     mapContainer: { width: '100%', height: 180, borderRadius: 24, overflow: 'hidden', backgroundColor: '#1E212B' },
     mapImg: { width: '100%', height: '100%' },
     similarList: { gap: 14 },
-    similarEventCard: { width: 250, height: 160, borderRadius: 20, overflow: 'hidden' },
+    similarEventCard: {
+        width: 280,
+        height: 180,
+        borderRadius: 24,
+        overflow: 'hidden',
+        backgroundColor: '#1E212B',
+        ...Shadows.md
+    },
     similarEvtImg: { width: '100%', height: '100%' },
-    similarEvtContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12 },
-    similarEvtTitle: { color: '#FFF', fontWeight: "800", fontSize: 16, marginBottom: 4 },
+    similarEvtContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16 },
+    similarEvtTitle: { color: '#FFF', fontWeight: "800", fontSize: 18, marginBottom: 8, letterSpacing: -0.5 },
     similarEvtFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    similarEvtDate: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: "600" },
-    similarRegisterBadge: { backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    similarRegisterText: { color: '#FFF', fontSize: 10, fontWeight: "800", textTransform: 'uppercase' },
-    footer: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'rgba(15, 17, 23, 0.98)', paddingHorizontal: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", zIndex: 1000 },
-    bookNowBtn: { backgroundColor: COLORS.primary, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
-    bookNowBtnText: { color: '#FFF', fontSize: 18, fontWeight: "900" },
+    similarEvtDate: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: "600" },
+    similarRegisterBadge: {
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)'
+    },
+    similarRegisterText: { color: '#FFF', fontSize: 11, fontWeight: "800", textTransform: 'uppercase', letterSpacing: 0.5 },
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
+        backgroundColor: 'rgba(15, 17, 23, 0.98)',
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: "rgba(255,255,255,0.05)",
+        zIndex: 10000,
+        elevation: 20
+    },
+    bookNowBtn: {
+        backgroundColor: COLORS.primary,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Shadows.lg
+    },
+    bookNowBtnText: { color: '#FFF', fontSize: 18, fontWeight: "900", letterSpacing: 0.3 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
     modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
     fullImage: { width: width, height: height * 0.8 }
