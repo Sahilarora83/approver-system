@@ -955,22 +955,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/events/:id/registrations", requireAuth, async (req, res) => {
+  app.get("/api/events/:id/registrations", async (req, res) => {
     try {
+      const eventId = String(req.params.id);
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       const search = req.query.search as string;
       const status = req.query.status as string;
 
-      const registrations = await storage.getRegistrations(
-        String(req.params.id),
-        limit,
-        offset,
-        search,
-        status
-      );
-      res.json(registrations);
+      const event = await storage.getEvent(eventId);
+      const registrations = await storage.getRegistrations(eventId, limit, offset, search, status);
+
+      // Privacy logic: Only organizers can see sensitive details
+      const isOrganizer = event && req.session.userId === event.organizerId;
+
+      const publicRegistrations = registrations.map(reg => {
+        if (isOrganizer) return reg;
+
+        // Strip sensitive info for public view
+        const { email, phone, formData, ...publicReg } = reg;
+        return publicReg;
+      });
+
+      res.json(publicRegistrations);
     } catch (error) {
+      console.error("[GetRegistrations] Error:", error);
       res.status(500).json({ message: "Failed to get registrations" });
     }
   });

@@ -190,6 +190,7 @@ export class SupabaseStorage implements IStorage {
       const transformed = toCamelCase(event) as any;
       if (event.users) {
         transformed.organizerProfileImage = event.users.profile_image;
+        transformed.organizerName = event.users.name;
       }
 
       return {
@@ -215,6 +216,7 @@ export class SupabaseStorage implements IStorage {
       const transformed = toCamelCase(event) as any;
       if (event.users) {
         transformed.organizerProfileImage = event.users.profile_image;
+        transformed.organizerName = event.users.name;
       }
 
       return {
@@ -236,6 +238,7 @@ export class SupabaseStorage implements IStorage {
     const transformed = toCamelCase(data);
     if (data.users) {
       transformed.organizerProfileImage = data.users.profile_image;
+      transformed.organizerName = data.users.name;
     }
     return transformed as Event;
   }
@@ -251,6 +254,7 @@ export class SupabaseStorage implements IStorage {
     const transformed = toCamelCase(data);
     if (data.users) {
       transformed.organizerProfileImage = data.users.profile_image;
+      transformed.organizerName = data.users.name;
     }
     return transformed as Event;
   }

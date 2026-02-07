@@ -203,7 +203,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     };
 
     const handleAction = useCallback(() => {
-        if (["approved", "checked_in", "checked_out"].includes(registrationStatus)) {
+        const approvedStates = ["approved", "checked_in", "checked_out"];
+        if (approvedStates.includes(registrationStatus)) {
             if (registration?.id) {
                 navigation.navigate("TicketView", { registrationId: registration.id });
             } else {
@@ -353,8 +354,8 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                         <Image
                                             key={i}
                                             source={{
-                                                uri: r.user?.profileImage
-                                                    ? resolveImageUrl(r.user.profileImage)
+                                                uri: r.profileImage
+                                                    ? resolveImageUrl(r.profileImage)
                                                     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.userId}`,
                                             }}
                                             style={[styles.miniAvatar, { left: i * 16 }]}
@@ -423,13 +424,68 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                             </View>
                         </View>
 
+                        {/* Similar Events (Moved under Location as requested) */}
+                        {similarEvents && similarEvents.length > 0 && (
+                            <View style={{ marginBottom: 32 }}>
+                                <View style={styles.sectionHeader}>
+                                    <ThemedText style={styles.sectionHeading}>More Events like this</ThemedText>
+                                    <Pressable>
+                                        <ThemedText style={styles.seeAllLink}>See All</ThemedText>
+                                    </Pressable>
+                                </View>
+                                <FlatList
+                                    horizontal
+                                    data={similarEvents}
+                                    keyExtractor={(item: any) => item.id}
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.similarList}
+                                    renderItem={({ item }: any) => (
+                                        <Pressable
+                                            style={styles.similarEventCard}
+                                            onPress={() =>
+                                                navigation.push("ParticipantEventDetail", { eventId: item.id })
+                                            }
+                                        >
+                                            <Image
+                                                source={{ uri: resolveImageUrl(item.coverImage) }}
+                                                style={styles.similarEvtImg}
+                                                contentFit="cover"
+                                            />
+                                            <LinearGradient
+                                                colors={["transparent", "rgba(0,0,0,0.8)"]}
+                                                style={StyleSheet.absoluteFill}
+                                            />
+                                            <View style={styles.similarEvtContent}>
+                                                <ThemedText style={styles.similarEvtTitle} numberOfLines={1}>
+                                                    {item.title}
+                                                </ThemedText>
+                                                <View style={styles.similarEvtFooter}>
+                                                    <ThemedText style={styles.similarEvtDate}>
+                                                        {new Date(item.startDate).toLocaleDateString("en-US", {
+                                                            month: "short",
+                                                            day: "numeric",
+                                                        })}
+                                                    </ThemedText>
+                                                    <View style={styles.similarRegisterBadge}>
+                                                        <ThemedText style={styles.similarRegisterText}>
+                                                            Book
+                                                        </ThemedText>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </Pressable>
+                                    )}
+                                />
+                            </View>
+                        )}
+
                         {/* Organizer */}
                         <View style={styles.organizerSection}>
                             <View style={styles.organizerRow}>
                                 <Image
                                     source={{
-                                        uri: event.organizer?.profileImage
-                                            ? resolveImageUrl(event.organizer.profileImage)
+                                        uri: event.organizerProfileImage
+                                            ? resolveImageUrl(event.organizerProfileImage)
                                             : `https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizerId}`,
                                     }}
                                     style={styles.organizerAvatar}
@@ -547,58 +603,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                             </View>
                         )}
 
-                        {/* Similar Events */}
-                        {similarEvents && similarEvents.length > 0 && (
-                            <View>
-                                <View style={styles.sectionHeader}>
-                                    <ThemedText style={styles.sectionHeading}>More Events like this</ThemedText>
-                                    <ThemedText style={styles.seeAllLink}>See All</ThemedText>
-                                </View>
-                                <FlatList
-                                    horizontal
-                                    data={similarEvents}
-                                    keyExtractor={(item: any) => item.id}
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.similarList}
-                                    renderItem={({ item }: any) => (
-                                        <Pressable
-                                            style={styles.similarEventCard}
-                                            onPress={() =>
-                                                navigation.push("ParticipantEventDetail", { eventId: item.id })
-                                            }
-                                        >
-                                            <Image
-                                                source={{ uri: resolveImageUrl(item.coverImage) }}
-                                                style={styles.similarEvtImg}
-                                                contentFit="cover"
-                                            />
-                                            <LinearGradient
-                                                colors={["transparent", "rgba(0,0,0,0.8)"]}
-                                                style={StyleSheet.absoluteFill}
-                                            />
-                                            <View style={styles.similarEvtContent}>
-                                                <ThemedText style={styles.similarEvtTitle} numberOfLines={1}>
-                                                    {item.title}
-                                                </ThemedText>
-                                                <View style={styles.similarEvtFooter}>
-                                                    <ThemedText style={styles.similarEvtDate}>
-                                                        {new Date(item.startDate).toLocaleDateString("en-US", {
-                                                            month: "short",
-                                                            day: "numeric",
-                                                        })}
-                                                    </ThemedText>
-                                                    <View style={styles.similarRegisterBadge}>
-                                                        <ThemedText style={styles.similarRegisterText}>
-                                                            Book
-                                                        </ThemedText>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        </Pressable>
-                                    )}
-                                />
-                            </View>
-                        )}
                     </View>
                 </View>
             </Animated.ScrollView>
@@ -611,11 +615,20 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                 ]}
             >
                 <Pressable
-                    style={({ pressed }) => [
-                        styles.bookNowBtn,
-                        { opacity: pressed || registrationStatus === "pending" ? 0.8 : 1 },
-                        registrationStatus === "approved" && { backgroundColor: "#34C759" },
-                    ]}
+                    style={({ pressed }) => {
+                        const approvedStates = ["approved", "checked_in", "checked_out"];
+                        const isApproved = approvedStates.includes(registrationStatus);
+                        const isPending = registrationStatus === "pending";
+                        const isRejected = registrationStatus === "rejected";
+
+                        return [
+                            styles.bookNowBtn,
+                            { opacity: pressed || isPending ? 0.8 : 1 },
+                            isApproved && { backgroundColor: "#34C759" },
+                            isRejected && { backgroundColor: "#EF4444" },
+                            isPending && { backgroundColor: "rgba(255,255,255,0.1)" }
+                        ];
+                    }}
                     onPress={handleAction}
                     disabled={registrationStatus === "pending" || isRegLoading}
                 >
@@ -623,11 +636,13 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         <ActivityIndicator color="#FFF" size="small" />
                     ) : (
                         <ThemedText style={styles.bookNowBtnText}>
-                            {registrationStatus === "approved"
+                            {["approved", "checked_in", "checked_out"].includes(registrationStatus)
                                 ? "View Ticket"
                                 : registrationStatus === "pending"
                                     ? "Pending Approval"
-                                    : "Book Ticket"}
+                                    : registrationStatus === "rejected"
+                                        ? "Registration Rejected"
+                                        : "Book Ticket"}
                         </ThemedText>
                     )}
                 </Pressable>
