@@ -204,13 +204,15 @@ export default function DiscoverEventsScreen({ navigation }: any) {
                                 {safeFormat(event.startDate, "MMM d, HH:mm")}
                             </ThemedText>
                         </View>
-                        <View style={styles.featuredInfoItem}>
+                    </View>
+                    {event.location && (
+                        <View style={[styles.featuredInfoItem, { marginTop: 8 }]}>
                             <Feather name="map-pin" size={14} color="#A78BFA" />
                             <ThemedText style={styles.featuredMetaText} numberOfLines={1}>
-                                {event.location || "Online"}
+                                {event.location}
                             </ThemedText>
                         </View>
-                    </View>
+                    )}
                 </View>
             </Pressable>
         </Animated.View>

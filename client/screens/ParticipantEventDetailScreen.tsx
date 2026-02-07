@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
     similarEvtDate: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: "600" },
     similarRegisterBadge: { backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
     similarRegisterText: { color: '#FFF', fontSize: 10, fontWeight: "800", textTransform: 'uppercase' },
-    footer: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'rgba(15, 17, 23, 0.98)', paddingHorizontal: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
+    footer: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'rgba(15, 17, 23, 0.98)', paddingHorizontal: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", zIndex: 1000 },
     bookNowBtn: { backgroundColor: COLORS.primary, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
     bookNowBtnText: { color: '#FFF', fontSize: 18, fontWeight: "900" },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },

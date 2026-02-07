@@ -114,7 +114,7 @@ export default function NotificationsScreen({ navigation }: any) {
         const typeLabel = (item.type || 'system').toUpperCase().replace('_', ' ');
 
         return (
-            <Animated.View entering={FadeInRight.delay(index * 50).duration(400).springify()}>
+            <Animated.View entering={FadeInUp.delay(index * 40).duration(400)}>
                 <Pressable
                     onPress={() => handlePress(item)}
                     style={({ pressed }) => [

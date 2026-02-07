@@ -34,8 +34,8 @@ export const UpdatePrompt = ({ isVisible, onDismiss }: UpdatePromptProps) => {
 
     return (
         <Animated.View
-            entering={SlideInUp.springify().damping(15)}
-            exiting={SlideOutUp}
+            entering={FadeInDown.duration(600)}
+            exiting={FadeOutUp}
             style={[styles.container, { top: insets.top + 10 }]}
         >
             <BlurView intensity={80} tint="dark" style={styles.blur}>
