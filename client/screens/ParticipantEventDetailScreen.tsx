@@ -314,7 +314,6 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                 source={{ uri: resolveImageUrl(img) }}
                                 style={styles.heroImage}
                                 contentFit="cover"
-                                placeholder={require("@/assets/images/placeholder.png")} // ✅ Placeholder
                                 transition={200}
                             />
                         ))}
