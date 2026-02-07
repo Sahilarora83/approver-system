@@ -136,12 +136,12 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
     const { data: similarEvents } = useQuery({
         queryKey: [`/api/events/similar`, event?.category, eventId],
         queryFn: async () => {
-            if (!event?.category) return [];
-            const res = await apiRequest("GET", `/api/events/search?category=${encodeURIComponent(event.category)}&limit=5`);
+            const categoryQuery = event?.category ? `category=${encodeURIComponent(event.category)}&` : "";
+            const res = await apiRequest("GET", `/api/events/search?${categoryQuery}limit=6`);
             const data = await res.json();
-            return data.events.filter((e: any) => e.id !== eventId);
+            return (data.events || []).filter((e: any) => e.id !== eventId);
         },
-        enabled: !!event?.category,
+        enabled: !!eventId,
     });
 
     const handleShare = async () => {
@@ -411,8 +411,16 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                                         onPress={() => navigation.push("ParticipantEventDetail", { eventId: item.id })}
                                     >
                                         <Image source={{ uri: resolveImageUrl(item.coverImage) }} style={styles.similarEvtImg} />
-                                        <LinearGradient colors={["transparent", "rgba(0,0,0,0.8)"]} style={StyleSheet.absoluteFill} />
-                                        <ThemedText style={styles.similarEvtTitle} numberOfLines={1}>{item.title}</ThemedText>
+                                        <LinearGradient colors={["transparent", "rgba(0,0,0,0.6)", "rgba(0,0,0,0.9)"]} style={StyleSheet.absoluteFill} />
+                                        <View style={styles.similarEvtContent}>
+                                            <ThemedText style={styles.similarEvtTitle} numberOfLines={1}>{item.title}</ThemedText>
+                                            <View style={styles.similarEvtFooter}>
+                                                <ThemedText style={styles.similarEvtDate}>{new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</ThemedText>
+                                                <View style={styles.similarRegisterBadge}>
+                                                    <ThemedText style={styles.similarRegisterText}>Register</ThemedText>
+                                                </View>
+                                            </View>
+                                        </View>
                                     </Pressable>
                                 ))}
                             </ScrollView>
@@ -436,7 +444,7 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         <ActivityIndicator color="#FFF" />
                     ) : (
                         <ThemedText style={styles.bookNowBtnText}>
-                            {registrationStatus === "approved" ? "Show Ticket" : registrationStatus === "pending" ? "Request Pending" : "Book Event"}
+                            {registrationStatus === "approved" ? "Show Ticket" : registrationStatus === "pending" ? "Request Pending" : "Register Now"}
                         </ThemedText>
                     )}
                 </Pressable>
