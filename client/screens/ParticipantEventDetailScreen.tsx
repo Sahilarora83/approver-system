@@ -460,9 +460,9 @@ export default function ParticipantEventDetailScreen({ route, navigation }: any)
                         <ActivityIndicator color="#FFF" />
                     ) : (
                         <ThemedText style={styles.bookNowBtnText}>
-                            {registrationStatus === "approved" ? "Joined • View Ticket" :
+                            {registrationStatus === "approved" ? "View Ticket" :
                                 registrationStatus === "pending" ? "Pending Approval" :
-                                    "Book Event"}
+                                    "Book Ticket"}
                         </ThemedText>
                     )}
                 </Pressable>
